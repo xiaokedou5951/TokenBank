@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useApprove } from '@/hooks/useToken';
 import { useDeposit } from '@/hooks/useTokenBank';
+import { isUserRejectedError } from '@/lib/utils';
 
 export function DepositForm() {
   const { address } = useAccount();
   const [amount, setAmount] = useState('');
 
-  const { approve, isPending: isApproving, isConfirming: isApproveConfirming, isSuccess: approveSuccess } = useApprove();
-  const { deposit, isPending: isDepositing, isConfirming: isDepositConfirming, isSuccess: depositSuccess } = useDeposit();
+  const { approve, isPending: isApproving, isConfirming: isApproveConfirming, isSuccess: approveSuccess, error: approveError } = useApprove();
+  const { deposit, isPending: isDepositing, isConfirming: isDepositConfirming, isSuccess: depositSuccess, error: depositError } = useDeposit();
 
   const handleApprove = () => {
     if (!amount || isNaN(Number(amount))) return;
@@ -56,6 +57,8 @@ export function DepositForm() {
         </div>
         {approveSuccess && <p className="text-sm text-green-600">授权成功！</p>}
         {depositSuccess && <p className="text-sm text-green-600">存款成功！</p>}
+        {approveError && !isUserRejectedError(approveError) && <p className="text-sm text-red-600">授权失败: {approveError.message}</p>}
+        {depositError && !isUserRejectedError(depositError) && <p className="text-sm text-red-600">存款失败: {depositError.message}</p>}
       </div>
     </div>
   );

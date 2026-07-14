@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useWithdraw } from '@/hooks/useTokenBank';
+import { isUserRejectedError } from '@/lib/utils';
 
 export function WithdrawForm() {
   const { address } = useAccount();
   const [amount, setAmount] = useState('');
 
-  const { withdraw, isPending, isConfirming, isSuccess } = useWithdraw();
+  const { withdraw, isPending, isConfirming, isSuccess, error } = useWithdraw();
 
   const handleWithdraw = () => {
     if (!amount || isNaN(Number(amount))) return;
@@ -39,6 +40,7 @@ export function WithdrawForm() {
           {isPending ? '提交中...' : isConfirming ? '确认中...' : '取款'}
         </button>
         {isSuccess && <p className="text-sm text-green-600">取款成功！</p>}
+        {error && !isUserRejectedError(error) && <p className="text-sm text-red-600">取款失败: {error.message}</p>}
       </div>
     </div>
   );

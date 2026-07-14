@@ -17,6 +17,9 @@ export const anvil = defineChain({
       http: ['http://127.0.0.1:8545'],
     },
   },
+  blockExplorers: {
+    default: { name: 'Local', url: 'http://localhost' },
+  },
 });
 
 // RainbowKit 配置
@@ -26,8 +29,8 @@ export const config = getDefaultConfig({
   chains: [anvil, mainnet, sepolia],
   transports: {
     [anvil.id]: http('http://127.0.0.1:8545'),
-    [mainnet.id]: http(),
-    [sepolia.id]: http(),
+    [mainnet.id]: http('https://rpc.ankr.com/eth'),
+    [sepolia.id]: http('https://rpc.ankr.com/eth_sepolia'),
   },
   ssr: true,
 });
