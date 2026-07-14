@@ -27,7 +27,13 @@ contracts/out/
 contracts/cache/
 contracts/broadcast/
 
-frontend/.next/
+# Frontend
 frontend/node_modules/
+frontend/.next/
 frontend/dist/
-frontend/.env.local
+frontend/out/
+frontend/.turbo/
+frontend/.vercel
+frontend/coverage/
+frontend/*.tsbuildinfo
+
