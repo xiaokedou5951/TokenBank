@@ -20,11 +20,14 @@ export function useDepositBalance(address: `0x${string}` | undefined) {
 
 export function useDeposit() {
   const queryClient = useQueryClient();
-  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
+  const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess, isError: isReceiptError, error: receiptError } = useWaitForTransactionReceipt({
     hash,
   });
+
+  // Combined error: write error (user rejected, simulation fail) or receipt error (on-chain revert)
+  const error = writeError || receiptError || undefined;
 
   // Invalidate balance queries when transaction confirms
   useEffect(() => {
@@ -56,11 +59,14 @@ export function useDeposit() {
 
 export function useWithdraw() {
   const queryClient = useQueryClient();
-  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
+  const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess, isError: isReceiptError, error: receiptError } = useWaitForTransactionReceipt({
     hash,
   });
+
+  // Combined error: write error (user rejected, simulation fail) or receipt error (on-chain revert)
+  const error = writeError || receiptError || undefined;
 
   // Invalidate balance queries when transaction confirms
   useEffect(() => {
