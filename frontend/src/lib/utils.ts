@@ -25,3 +25,19 @@ export function isUserRejectedError(error: Error | null): boolean {
     (error as any).code === 'ACTION_REJECTED'
   );
 }
+
+export function getContractErrorMessage(error: Error | null | undefined): string {
+  if (!error) return 'Unknown error';
+
+  const shortMessage = (error as any).shortMessage;
+  if (typeof shortMessage === 'string' && shortMessage.trim()) {
+    return shortMessage;
+  }
+
+  const message = error.message;
+  if (message && message.trim()) {
+    return message;
+  }
+
+  return 'Transaction failed';
+}

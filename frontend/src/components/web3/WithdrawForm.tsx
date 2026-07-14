@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { useWithdraw } from '@/hooks/useTokenBank';
-import { isUserRejectedError } from '@/lib/utils';
+import { isUserRejectedError, getContractErrorMessage } from '@/lib/utils';
 import { useToast } from '@/components/web3/Toast';
 
 export function WithdrawForm() {
@@ -29,7 +29,8 @@ export function WithdrawForm() {
   // Handle errors (silent for user rejected)
   useEffect(() => {
     if (error && !isUserRejectedError(error)) {
-      addToast('error', 'Withdrawal failed');
+      console.error('Withdraw failed:', error);
+      addToast('error', getContractErrorMessage(error));
       reset();
     }
   }, [error, addToast, reset]);

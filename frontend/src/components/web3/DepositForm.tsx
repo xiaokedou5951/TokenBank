@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { useApprove, useTokenAllowance } from '@/hooks/useToken';
 import { useDeposit } from '@/hooks/useTokenBank';
-import { isUserRejectedError } from '@/lib/utils';
+import { isUserRejectedError, getContractErrorMessage } from '@/lib/utils';
 import { useToast } from '@/components/web3/Toast';
 import { TOKENBANK_ADDRESS } from '@/lib/contracts';
 
@@ -46,14 +46,16 @@ export function DepositForm() {
   // Handle errors (silent for user rejected)
   useEffect(() => {
     if (approveError && !isUserRejectedError(approveError)) {
-      addToast('error', 'Approval failed');
+      console.error('Approve failed:', approveError);
+      addToast('error', getContractErrorMessage(approveError));
       resetApprove();
     }
   }, [approveError, addToast, resetApprove]);
 
   useEffect(() => {
     if (depositError && !isUserRejectedError(depositError)) {
-      addToast('error', 'Deposit failed');
+      console.error('Deposit failed:', depositError);
+      addToast('error', getContractErrorMessage(depositError));
       resetDeposit();
     }
   }, [depositError, addToast, resetDeposit]);

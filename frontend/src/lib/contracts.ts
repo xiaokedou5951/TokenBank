@@ -86,6 +86,16 @@ export const tokenBankAbi = [
     ],
     anonymous: false,
   },
+  {
+    type: 'error',
+    name: 'ZeroAmount',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InsufficientBalance',
+    inputs: [],
+  },
 ] as const;
 
 // 合约地址
