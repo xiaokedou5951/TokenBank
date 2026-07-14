@@ -26,3 +26,8 @@ contracts/lib/
 contracts/out/
 contracts/cache/
 contracts/broadcast/
+
+frontend/.next/
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
