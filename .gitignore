@@ -21,5 +21,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# contracts
+# Foundry
 contracts/lib/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
