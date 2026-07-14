@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import { tokenBankAbi, TOKENBANK_ADDRESS } from '@/lib/contracts';
 import { parseTokenAmount } from '@/lib/utils';
 
@@ -17,11 +19,19 @@ export function useDepositBalance(address: `0x${string}` | undefined) {
 }
 
 export function useDeposit() {
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const queryClient = useQueryClient();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
+
+  // Invalidate balance queries when transaction confirms
+  useEffect(() => {
+    if (isSuccess && hash) {
+      queryClient.invalidateQueries({ queryKey: ['readContract'] });
+    }
+  }, [isSuccess, hash, queryClient]);
 
   const deposit = (amount: string) => {
     const amountBigInt = parseTokenAmount(amount);
@@ -40,15 +50,24 @@ export function useDeposit() {
     isConfirming,
     isSuccess,
     error,
+    reset,
   };
 }
 
 export function useWithdraw() {
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const queryClient = useQueryClient();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
+
+  // Invalidate balance queries when transaction confirms
+  useEffect(() => {
+    if (isSuccess && hash) {
+      queryClient.invalidateQueries({ queryKey: ['readContract'] });
+    }
+  }, [isSuccess, hash, queryClient]);
 
   const withdraw = (amount: string) => {
     const amountBigInt = parseTokenAmount(amount);
@@ -67,5 +86,6 @@ export function useWithdraw() {
     isConfirming,
     isSuccess,
     error,
+    reset,
   };
 }

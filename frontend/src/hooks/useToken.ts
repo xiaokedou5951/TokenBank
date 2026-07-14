@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import { myTokenAbi, TOKEN_ADDRESS, TOKENBANK_ADDRESS } from '@/lib/contracts';
 import { parseTokenAmount } from '@/lib/utils';
 
@@ -29,11 +31,19 @@ export function useTokenAllowance(address: `0x${string}` | undefined) {
 }
 
 export function useApprove() {
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const queryClient = useQueryClient();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
+
+  // Invalidate balance queries when transaction confirms
+  useEffect(() => {
+    if (isSuccess && hash) {
+      queryClient.invalidateQueries({ queryKey: ['readContract'] });
+    }
+  }, [isSuccess, hash, queryClient]);
 
   const approve = (amount: string) => {
     const amountBigInt = parseTokenAmount(amount);
@@ -52,5 +62,6 @@ export function useApprove() {
     isConfirming,
     isSuccess,
     error,
+    reset,
   };
 }

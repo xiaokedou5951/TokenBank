@@ -1,19 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap');
 @import 'tailwindcss';
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --bg-page: #F8F9FB;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #F1F3F5;
+  --text-primary: #1A1D23;
+  --text-muted: #6B7280;
+  --accent-blue: #2563EB;
+  --accent-green: #059669;
+  --accent-amber: #D97706;
+  --border-subtle: #E5E7EB;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  --shadow-card-hover: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Card with soft colored shadow */
+.card {
+  position: relative;
+  background: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* Balance card gets a subtle gradient glow underneath */
+.card-balance {
+  position: relative;
+}
+
+.card-balance::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 10%;
+  right: 10%;
+  height: 20px;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.06), rgba(5, 150, 105, 0.08), rgba(217, 119, 6, 0.06));
+  filter: blur(12px);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Input focus states */
+input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Button transitions */
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Smooth fade-in for data updates */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Toast animations */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(100%); }
+}
+
+.toast-enter {
+  animation: toastIn 0.3s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+
+.toast-exit {
+  animation: toastOut 0.3s ease-in forwards;
+}
+
+/* Balance pulse on update */
+@keyframes balancePulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.animate-balance-pulse {
+  animation: balancePulse 0.4s ease-in-out;
+}
+
+/* Spinner for loading states */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin 1.5s linear infinite;
 }
