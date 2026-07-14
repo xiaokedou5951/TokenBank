@@ -1,6 +1,7 @@
 import { formatUnits, parseUnits } from 'viem';
 
-export function formatTokenAmount(amount: bigint, decimals: number = 18): string {
+export function formatTokenAmount(amount: bigint | undefined, decimals: number = 18): string {
+  if (amount === undefined) return '0';
   return formatUnits(amount, decimals);
 }
 
