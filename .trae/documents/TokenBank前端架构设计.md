@@ -45,34 +45,27 @@ frontend/
 ├── public/                    # 静态资源
 ├── src/
 │   ├── app/                   # Next.js App Router
-│   │   ├── layout.tsx        # 根布局（包含 Providers）
+│   │   ├── layout.tsx        # 根布局
 │   │   ├── page.tsx          # 首页
-│   │   └── globals.css       # 全局样式
+│   │   ├── providers.tsx     # Wagmi / RainbowKit / QueryClient Providers
+│   │   └── globals.css       # 全局样式 + Tailwind v4 主题变量
 │   ├── components/           # React 组件
-│   │   ├── ui/              # 基础 UI 组件
-│   │   │   ├── Button.tsx
-│   │   │   ├── Input.tsx
-│   │   │   └── Card.tsx
 │   │   └── web3/            # Web3 相关组件
 │   │       ├── ConnectWallet.tsx      # 钱包连接按钮
-│   │       ├── TokenBalance.tsx       # Token 余额显示
-│   │       ├── DepositBalance.tsx     # 存款余额显示
-│   │       ├── AllowanceDisplay.tsx   # 授权额度显示
+│   │       ├── BalanceCard.tsx        # 钱包余额 / 存款余额 / 授权额度聚合卡片
 │   │       ├── DepositForm.tsx        # 存款表单
-│   │       └── WithdrawForm.tsx       # 取款表单
+│   │       ├── WithdrawForm.tsx       # 取款表单
+│   │       └── ActivityLog.tsx        # 交易活动记录（Receipts）
 │   ├── hooks/               # 自定义 Hooks
 │   │   ├── useToken.ts      # Token 相关操作
-│   │   ├── useTokenBank.ts  # TokenBank 合约交互
-│   │   └── useContract.ts   # 合约实例管理
-│   ├── lib/                 # 工具库
-│   │   ├── contracts.ts     # 合约配置（地址、ABI）
-│   │   ├── wagmi.ts         # Wagmi 配置
-│   │   └── utils.ts         # 通用工具函数
-│   └── types/               # TypeScript 类型定义
-│       └── contracts.ts     # 合约 ABI 类型（自动生成）
+│   │   └── useTokenBank.ts  # TokenBank 合约交互
+│   └── lib/                 # 工具库
+│       ├── contracts.ts     # 合约配置（地址、内联 ABI）
+│       ├── wagmi.ts         # Wagmi + RainbowKit 配置
+│       └── utils.ts         # 通用工具函数
 ├── .env.local.example       # 环境变量示例
-├── next.config.ts           # Next.js 配置
-├── tailwind.config.ts       # Tailwind 配置
+├── next.config.ts           # Next.js 配置（默认启用 Turbopack）
+├── postcss.config.js        # Tailwind CSS v4 PostCSS 配置
 ├── tsconfig.json            # TypeScript 配置
 └── package.json             # 依赖配置
 ```
@@ -98,7 +91,7 @@ frontend/
 **useToken.ts**
 ```typescript
 - useTokenBalance() - 查询用户 Token 余额
-- useTokenAllowance() - 查询授权额度
+- useTokenAllowance() - 查询对 TokenBank 的授权额度
 - useApprove() - 授权 TokenBank 合约
 ```
 
@@ -109,19 +102,23 @@ frontend/
 - useWithdraw() - 取款操作
 ```
 
+> 实际代码中未使用独立的 `useContract.ts`，ABI 与地址统一在 `src/lib/contracts.ts` 中管理。
+
 #### 3.2.4 组件设计
 
 **页面结构 (page.tsx)**
 ```
-- ConnectWallet（钱包连接按钮）
-- 余额信息卡片
-  - TokenBalance（钱包余额）
-  - DepositBalance（存款余额）
-  - AllowanceDisplay（授权额度）
-- 操作表单
+- Header
+  - ConnectWallet（钱包连接按钮）
+- 左侧主内容区
+  - BalanceCard（聚合显示钱包余额、存款余额、授权额度）
   - DepositForm（存款表单：授权 + 存款）
   - WithdrawForm（取款表单）
+- 右侧边栏
+  - ActivityLog（交易活动记录 / Receipts）
 ```
+
+> 实际实现将原设计中的 `TokenBalance`、`DepositBalance`、`AllowanceDisplay` 三个独立组件合并为 `BalanceCard`；并新增了 `ActivityLog` 组件用于展示交易状态与收据。
 
 ### 3.3 数据流设计
 
@@ -140,17 +137,16 @@ frontend/
 
 ### 3.4 合约 ABI 处理方案
 
-**方案：手动复制 + TypeScript 类型生成**
+**方案：内联 ABI（as const）**
 
-1. 从 `contracts/out/TokenBank.sol/TokenBank.json` 提取 ABI
-2. 从 `contracts/out/MyToken.sol/MyToken.json` 提取 ABI
-3. 创建 `src/types/contracts.ts` 定义类型
-4. 创建 `src/lib/contracts.ts` 存储 ABI 和地址
+1. 从 `contracts/out/TokenBank.sol/TokenBank.json` 和 `contracts/out/MyToken.sol/MyToken.json` 提取所需 ABI 片段
+2. 在 `src/lib/contracts.ts` 中以内联数组形式定义 `myTokenAbi` 与 `tokenBankAbi`，并标注 `as const`
+3. 合约地址同样在该文件中管理，优先从环境变量读取，附带 Anvil 默认地址作为 fallback
 
 **原因：**
-- Foundry 项目不需要额外配置 ABI 导出工具
-- 手动复制更可控，避免构建依赖
-- ABI 相对稳定，不需要频繁更新
+- 内联 ABI 配合 `as const` 可直接为 Wagmi/Viem 提供类型推断
+- 无需额外的 TypeScript 类型生成步骤，减少构建依赖
+- ABI 片段精简，只保留前端实际使用的函数、事件和错误，避免冗余
 
 ### 3.5 环境变量配置
 
@@ -203,8 +199,8 @@ NEXT_PUBLIC_CHAIN_ID=31337           # 链 ID
 ## 五、关键技术决策
 
 ### 5.1 Next.js 版本选择
-**决策：使用 Next.js 15（App Router）**
-- 原因：Next.js 16 尚未发布，使用最新的稳定版本 15
+**决策：使用 Next.js 16（App Router）**
+- 原因：Next.js 16 已发布，默认启用 Turbopack，支持 React 19，符合 PRD 要求
 - 使用 App Router 而非 Pages Router（更现代，支持 React Server Components）
 
 ### 5.2 状态管理方案
@@ -255,25 +251,29 @@ NEXT_PUBLIC_CHAIN_ID=31337           # 链 ID
 ## 七、依赖清单
 
 ### 核心依赖
+
+实际 `frontend/package.json` 中的依赖版本如下：
+
 ```json
 {
   "dependencies": {
-    "next": "^15.0.0",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "wagmi": "^2.0.0",
-    "viem": "^2.0.0",
-    "@rainbow-me/rainbowkit": "^2.0.0",
-    "@tanstack/react-query": "^5.0.0"
+    "@rainbow-me/rainbowkit": "^2.2.11",
+    "@tanstack/react-query": "^5.101.2",
+    "next": "^16.2.10",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "viem": "^2.55.1",
+    "wagmi": "^2.19.5"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "tailwindcss": "^4.0.0",
-    "postcss": "^8.0.0",
-    "autoprefixer": "^10.0.0"
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.5.2",
+    "postcss": "^8.5.19",
+    "tailwindcss": "^4.3.2",
+    "typescript": "^5.9.3"
   }
 }
 ```
@@ -281,30 +281,32 @@ NEXT_PUBLIC_CHAIN_ID=31337           # 链 ID
 ## 八、风险与注意事项
 
 ### 8.1 技术风险
-- **Next.js 16 不存在**：使用 Next.js 15 替代
-- **Tailwind CSS 4 配置**：v4 使用新的配置方式，需要注意
-- **Wagmi v2  breaking changes**：确保使用最新的 API
+- **Next.js 16 + Turbopack**：已在实际项目中验证，但第三方包仍需关注兼容性
+- **Tailwind CSS 4**：使用 `@tailwindcss/postcss` 与 CSS 变量配置，不再依赖 `tailwind.config.ts`
+- **Wagmi v2 breaking changes**：确保使用与 React 19 / Next.js 16 兼容的最新 API
 
 ### 8.2 开发注意事项
-- **合约地址**：需要从部署日志中提取实际地址
-- **ABI 更新**：合约修改后需要手动更新前端 ABI
-- **网络配置**：本地开发需要配置自定义链（chainId: 31337）
-- **Gas 估算**：交易前需要估算 Gas，避免失败
+- **合约地址**：`contracts.ts` 中已内置 Anvil 默认地址作为 fallback，生产环境需通过环境变量覆盖
+- **ABI 更新**：合约修改后需同步更新 `src/lib/contracts.ts` 中的内联 ABI
+- **网络配置**：本地开发使用自定义链 `anvil`（chainId: 31337），已在 `wagmi.ts` 中配置
+- **Gas 估算**：Wagmi 会在交易前自动模拟并估算 Gas，失败时通过 `error` 暴露
+- **交易链接**：`ActivityLog` 当前固定链接到 Etherscan，本地网络交易无法查看，后续可按链 ID 动态生成浏览器链接
 
-### 8.3 用户体验优化
+### 8.3 用户体验优化（已实现）
 - 添加加载状态（交易确认中）
-- 添加错误提示（授权不足、余额不足）
-- 添加成功提示（交易成功）
-- 自动刷新余额（交易完成后）
-- 支持键盘操作（Enter 提交）
+- 添加错误提示（授权不足、余额不足、用户拒绝等）
+- 添加成功提示（交易成功，Receipts 列表）
+- 自动刷新余额（交易完成后通过 `queryClient.invalidateQueries`）
+- 余额变动时添加脉冲动画反馈
 
 ## 九、总结
 
-本计划为 TokenBank 项目设计了完整的前端架构，包括：
-- 清晰的项目目录结构
-- 模块化的组件设计
-- 合理的数据流方案
-- 详细的实施步骤
-- 完善的验证计划
+本文档已根据实际代码完成校准，当前前端实现：
+- 使用 **Next.js 16.2 + React 19 + Turbopack** 构建
+- 使用 **Tailwind CSS 4**（`@tailwindcss/postcss`）进行样式管理
+- 使用 **Wagmi v2 + Viem v2 + RainbowKit v2** 进行钱包连接与合约交互
+- 合约 ABI 以内联 `as const` 形式集中管理于 `src/lib/contracts.ts`
+- 组件层面将余额/授权聚合为 `BalanceCard`，并新增 `ActivityLog` 交易记录
+- 已实现授权、存款、取款、余额刷新、交易状态反馈等核心功能
 
-执行此计划后，将得到一个功能完整、代码清晰、易于维护的 Web3 前端应用。
+文档与代码基本一致，主要差异在于组件拆分粒度与 ABI 管理方式，均已在本版本中修正。
