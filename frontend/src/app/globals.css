@@ -1,52 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 @import 'tailwindcss';
 
 :root {
-  --bg-page: #F8F9FB;
-  --bg-card: #FFFFFF;
-  --bg-elevated: #F1F3F5;
-  --text-primary: #1A1D23;
-  --text-muted: #6B7280;
-  --accent-blue: #2563EB;
-  --accent-green: #059669;
-  --accent-amber: #D97706;
-  --border-subtle: #E5E7EB;
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-  --shadow-card-hover: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+  /* Ledger palette: paper, ink, and bank-seal accents */
+  --parchment: #F7F5F0;
+  --paper: #FDFCF8;
+  --ink: #1C1917;
+  --ink-muted: #78716C;
+  --border: #E7E5E0;
+  --seal-red: #B91C1C;
+  --seal-red-bg: #FEF2F2;
+  --ink-green: #166534;
+  --ink-green-bg: #F0FDF4;
+  --copper: #9A4E28;
+  --copper-bg: #FFF7ED;
+
+  --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.04), 0 6px 16px rgba(28, 25, 23, 0.03);
+  --shadow-card-hover: 0 2px 6px rgba(28, 25, 23, 0.05), 0 10px 24px rgba(28, 25, 23, 0.04);
 }
 
 body {
-  background: var(--bg-page);
-  color: var(--text-primary);
+  background: var(--parchment);
+  color: var(--ink);
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Bricolage Grotesque', sans-serif;
   letter-spacing: -0.02em;
 }
 
 .font-mono {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'IBM Plex Mono', monospace;
 }
 
-/* Card with soft colored shadow */
+/* Card with subtle paper shadow */
 .card {
   position: relative;
-  background: var(--bg-card);
-  border-radius: 16px;
-  border: 1px solid var(--border-subtle);
+  background: var(--paper);
+  border-radius: 12px;
+  border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
-  transition: box-shadow 0.3s ease;
+  transition: box-shadow 0.25s ease;
 }
 
 .card:hover {
   box-shadow: var(--shadow-card-hover);
 }
 
-/* Balance card gets a subtle gradient glow underneath */
+/* Balance card gets a faint copper-ink glow */
 .card-balance {
   position: relative;
 }
@@ -54,12 +58,12 @@ h1, h2, h3 {
 .card-balance::after {
   content: '';
   position: absolute;
-  bottom: -1px;
-  left: 10%;
-  right: 10%;
-  height: 20px;
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.06), rgba(5, 150, 105, 0.08), rgba(217, 119, 6, 0.06));
-  filter: blur(12px);
+  bottom: -2px;
+  left: 12%;
+  right: 12%;
+  height: 18px;
+  background: linear-gradient(90deg, rgba(154, 78, 40, 0.05), rgba(22, 101, 52, 0.06), rgba(154, 78, 40, 0.05));
+  filter: blur(10px);
   border-radius: 50%;
   pointer-events: none;
   z-index: -1;
@@ -68,8 +72,8 @@ h1, h2, h3 {
 /* Input focus states */
 input:focus {
   outline: none;
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: var(--copper);
+  box-shadow: 0 0 0 3px rgba(154, 78, 40, 0.08);
 }
 
 /* Button transitions */
@@ -78,7 +82,7 @@ button {
 }
 
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -92,29 +96,10 @@ button:disabled {
   animation: fadeIn 0.3s ease-out;
 }
 
-/* Toast animations */
-@keyframes toastIn {
-  from { opacity: 0; transform: translateX(100%); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes toastOut {
-  from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(100%); }
-}
-
-.toast-enter {
-  animation: toastIn 0.3s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
-}
-
-.toast-exit {
-  animation: toastOut 0.3s ease-in forwards;
-}
-
 /* Balance pulse on update */
 @keyframes balancePulse {
   0% { opacity: 1; }
-  50% { opacity: 0.5; }
+  50% { opacity: 0.55; }
   100% { opacity: 1; }
 }
 
@@ -129,4 +114,42 @@ button:disabled {
 
 .animate-spin-slow {
   animation: spin 1.5s linear infinite;
+}
+
+/* Receipt activity log */
+.activity-log {
+  position: relative;
+}
+
+.receipt {
+  /* Subtle receipt texture via border style */
+}
+
+/* Perforated edge on receipts */
+.receipt-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background-image: radial-gradient(circle, var(--parchment) 2px, transparent 2.5px);
+  background-size: 10px 10px;
+  background-position: center;
+  background-repeat: repeat-x;
+  pointer-events: none;
+}
+
+.receipt-edge-top {
+  top: -3px;
+}
+
+.receipt-error {
+  border-color: rgba(185, 28, 28, 0.18);
+}
+
+.receipt-success {
+  border-color: rgba(22, 101, 52, 0.15);
+}
+
+.receipt-pending {
+  border-style: dashed;
 }
