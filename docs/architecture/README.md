@@ -6,10 +6,11 @@
 
 ## 2. 关键结论
 
-- TokenBank 是一个去中心化的 ERC20 代币存取 DApp。
+- TokenBank 是一个去中心化的 ERC20 代币存取 DApp，支持 EIP-2612 Permit 签名存款。
 - 系统由两层构成：**链上智能合约层** + **Next.js 前端层**。
-- 合约层负责资产托管与存取逻辑；前端层通过 Wagmi/Viem 与链交互，提供钱包连接、余额展示、授权、存取款界面。
-- 当前仅支持单代币（MyToken）和单一 Bank 合约，无后端服务。
+- 合约层包含 `MyTokenPermit`（支持 EIP-2612 的 ERC20 代币）和 `TokenBankPermit`（支持 Permit 存款的银行合约）。
+- 前端提供两种存款方式：传统 Approve+Deposit（两步）和 Permit Deposit（一步签名存款）。
+- 当前仅支持单代币和单一 Bank 合约，无后端服务。
 
 ## 3. 文档导航
 
@@ -35,3 +36,4 @@
 
 - [ ] 是否需要引入后端索引服务以支持历史交易查询？
 - [ ] 是否增加多链部署配置（目前仅本地 Anvil + Sepolia + Mainnet 配置）？
+- [ ] 是否在传统 Approve+Deposit 流程基础上默认推荐 Permit Deposit？
