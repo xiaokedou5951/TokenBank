@@ -2,8 +2,8 @@
 pragma solidity ^0.8.30;
 
 import {Script, console} from "forge-std/Script.sol";
-import {MyToken} from "../src/MyToken.sol";
-import {TokenBank} from "../src/TokenBank.sol";
+import {MyTokenPermit} from "../src/MyTokenPermit.sol";
+import {TokenBankPermit} from "../src/TokenBankPermit.sol";
 
 contract Deploy is Script {
     function run() external {
@@ -15,11 +15,11 @@ contract Deploy is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        MyToken myToken = new MyToken(initialSupply);
-        console.log("MyToken deployed to:", address(myToken));
+        MyTokenPermit myTokenPermit = new MyTokenPermit(initialSupply);
+        console.log("MyTokenPermit deployed to:", address(myTokenPermit));
 
-        TokenBank tokenBank = new TokenBank(address(myToken));
-        console.log("TokenBank deployed to:", address(tokenBank));
+        TokenBankPermit tokenBankPermit = new TokenBankPermit(address(myTokenPermit));
+        console.log("TokenBankPermit deployed to:", address(tokenBankPermit));
 
         vm.stopBroadcast();
     }

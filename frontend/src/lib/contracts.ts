@@ -1,6 +1,6 @@
 import { type Address } from 'viem';
 
-// MyToken ABI
+// MyToken ABI (includes ERC20Permit)
 export const myTokenAbi = [
   {
     type: 'function',
@@ -43,6 +43,35 @@ export const myTokenAbi = [
     outputs: [{ name: '', type: 'string', internalType: 'string' }],
     stateMutability: 'view',
   },
+  {
+    type: 'function',
+    name: 'permit',
+    inputs: [
+      { name: 'owner', type: 'address', internalType: 'address' },
+      { name: 'spender', type: 'address', internalType: 'address' },
+      { name: 'value', type: 'uint256', internalType: 'uint256' },
+      { name: 'deadline', type: 'uint256', internalType: 'uint256' },
+      { name: 'v', type: 'uint8', internalType: 'uint8' },
+      { name: 'r', type: 'bytes32', internalType: 'bytes32' },
+      { name: 's', type: 'bytes32', internalType: 'bytes32' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'nonces',
+    inputs: [{ name: 'owner', type: 'address', internalType: 'address' }],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'DOMAIN_SEPARATOR',
+    inputs: [],
+    outputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
+    stateMutability: 'view',
+  },
 ] as const;
 
 // TokenBank ABI
@@ -63,6 +92,19 @@ export const tokenBankAbi = [
   },
   {
     type: 'function',
+    name: 'permitDeposit',
+    inputs: [
+      { name: 'amount', type: 'uint256', internalType: 'uint256' },
+      { name: 'deadline', type: 'uint256', internalType: 'uint256' },
+      { name: 'v', type: 'uint8', internalType: 'uint8' },
+      { name: 'r', type: 'bytes32', internalType: 'bytes32' },
+      { name: 's', type: 'bytes32', internalType: 'bytes32' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'withdraw',
     inputs: [{ name: 'amount', type: 'uint256', internalType: 'uint256' }],
     outputs: [],
@@ -71,6 +113,15 @@ export const tokenBankAbi = [
   {
     type: 'event',
     name: 'Deposit',
+    inputs: [
+      { name: 'user', type: 'address', indexed: true, internalType: 'address' },
+      { name: 'amount', type: 'uint256', indexed: false, internalType: 'uint256' },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'PermitDeposit',
     inputs: [
       { name: 'user', type: 'address', indexed: true, internalType: 'address' },
       { name: 'amount', type: 'uint256', indexed: false, internalType: 'uint256' },
@@ -93,7 +144,17 @@ export const tokenBankAbi = [
   },
   {
     type: 'error',
+    name: 'ZeroAddress',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'InsufficientBalance',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'PermitFailed',
     inputs: [],
   },
 ] as const;

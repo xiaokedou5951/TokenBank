@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useSignTypedData, useChainId } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 import { myTokenAbi, TOKEN_ADDRESS, TOKENBANK_ADDRESS } from '@/lib/contracts';
 import { parseTokenAmount } from '@/lib/utils';
@@ -27,6 +27,26 @@ export function useTokenAllowance(address: `0x${string}` | undefined) {
     query: {
       enabled: !!address,
     },
+  });
+}
+
+export function useTokenNonce(address: `0x${string}` | undefined) {
+  return useReadContract({
+    address: TOKEN_ADDRESS,
+    abi: myTokenAbi,
+    functionName: 'nonces',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+    },
+  });
+}
+
+export function useTokenDomainSeparator() {
+  return useReadContract({
+    address: TOKEN_ADDRESS,
+    abi: myTokenAbi,
+    functionName: 'DOMAIN_SEPARATOR',
   });
 }
 
@@ -64,6 +84,55 @@ export function useApprove() {
     isPending,
     isConfirming,
     isSuccess,
+    error,
+    reset,
+  };
+}
+
+// Generate EIP-2612 permit signature
+export function usePermitSignature() {
+  const { signTypedDataAsync, data: signature, isPending, error, reset } = useSignTypedData();
+  const chainId = useChainId();
+
+  const generatePermitSignature = async (
+    owner: `0x${string}`,
+    spender: `0x${string}`,
+    value: bigint,
+    nonce: bigint,
+    deadline: bigint
+  ) => {
+    const domain = {
+      name: 'MyTokenPermit',
+      version: '1',
+      chainId,
+      verifyingContract: TOKEN_ADDRESS,
+    };
+
+    const types = {
+      Permit: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'deadline', type: 'uint256' },
+      ],
+    };
+
+    const message = {
+      owner,
+      spender,
+      value,
+      nonce,
+      deadline,
+    };
+
+    await signTypedDataAsync({ domain, types, primaryType: 'Permit', message });
+  };
+
+  return {
+    generatePermitSignature,
+    signature,
+    isPending,
     error,
     reset,
   };

@@ -57,6 +57,51 @@ export function useDeposit() {
   };
 }
 
+export function usePermitDeposit() {
+  const queryClient = useQueryClient();
+  const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess, isError: isReceiptError, error: receiptError } = useWaitForTransactionReceipt({
+    hash,
+  });
+
+  // Combined error: write error (user rejected, simulation fail) or receipt error (on-chain revert)
+  const error = writeError || receiptError || undefined;
+
+  // Invalidate balance queries when transaction confirms
+  useEffect(() => {
+    if (isSuccess && hash) {
+      queryClient.invalidateQueries({ queryKey: ['readContract'] });
+    }
+  }, [isSuccess, hash, queryClient]);
+
+  const permitDeposit = (
+    amount: string,
+    deadline: bigint,
+    v: number,
+    r: `0x${string}`,
+    s: `0x${string}`
+  ) => {
+    const amountBigInt = parseTokenAmount(amount);
+    writeContract({
+      address: TOKENBANK_ADDRESS,
+      abi: tokenBankAbi,
+      functionName: 'permitDeposit',
+      args: [amountBigInt, deadline, v, r, s],
+    });
+  };
+
+  return {
+    permitDeposit,
+    hash,
+    isPending,
+    isConfirming,
+    isSuccess,
+    error,
+    reset,
+  };
+}
+
 export function useWithdraw() {
   const queryClient = useQueryClient();
   const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
