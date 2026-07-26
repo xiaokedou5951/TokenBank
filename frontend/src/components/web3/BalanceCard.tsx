@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { useTokenBalance, useTokenAllowance } from '@/hooks/useToken';
+import { useTokenBalance, useTokenAllowance, usePermit2Allowance } from '@/hooks/useToken';
 import { useDepositBalance } from '@/hooks/useTokenBank';
 import { formatTokenAmount } from '@/lib/utils';
 
@@ -12,6 +12,8 @@ export function BalanceCard() {
   const { data: tokenBalance, isLoading: isLoadingToken } = useTokenBalance(address);
   const { data: depositBalance, isLoading: isLoadingDeposit } = useDepositBalance(address);
   const { data: allowance, isLoading: isLoadingAllowance } = useTokenAllowance(address);
+  const { data: permit2Allowance } = usePermit2Allowance(address);
+  const hasPermit2Allowance = permit2Allowance !== undefined && (permit2Allowance as bigint) > 0n;
 
   const [pulsing, setPulsing] = useState(false);
   const prevTokenBalance = useRef<string | undefined>(undefined);
@@ -54,7 +56,7 @@ export function BalanceCard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Wallet Balance */}
         <div className="group">
           <div className="text-xs text-[var(--ink-muted)] uppercase tracking-wider mb-2">Wallet</div>
@@ -92,6 +94,21 @@ export function BalanceCard() {
             )}
           </div>
           <div className="text-sm text-[var(--ink-muted)] mt-1">MTK</div>
+        </div>
+
+        {/* Permit2 Status */}
+        <div className="group">
+          <div className="text-xs text-[var(--ink-muted)] uppercase tracking-wider mb-2">Permit2</div>
+          <div className="font-mono text-3xl font-semibold group-hover:text-[var(--copper)] transition-colors">
+            {hasPermit2Allowance ? (
+              <span className="text-[var(--ink-green)]">Active</span>
+            ) : (
+              <span className="text-[var(--ink-muted)]/60">Inactive</span>
+            )}
+          </div>
+          <div className="text-sm text-[var(--ink-muted)] mt-1">
+            {hasPermit2Allowance ? 'Approved' : 'Not approved'}
+          </div>
         </div>
       </div>
     </div>

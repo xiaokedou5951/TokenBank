@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
-import { useApprove, useTokenAllowance, usePermit2Allowance, useApprovePermit2, usePermit2Signature } from '@/hooks/useToken';
+import { useApprove, useTokenAllowance, usePermit2Allowance, useApprovePermit2, usePermit2Signature, usePermit2Nonce } from '@/hooks/useToken';
 import { useDeposit, usePermit2Deposit } from '@/hooks/useTokenBank';
 import { isUserRejectedError, getContractErrorMessage, parseTokenAmount } from '@/lib/utils';
 import { useActivity } from '@/components/web3/ActivityLog';
@@ -52,6 +52,7 @@ export function DepositForm() {
     error: signError,
     reset: resetSign,
   } = usePermit2Signature();
+  const { getNextNonce, refetchNonce } = usePermit2Nonce(address);
   const {
     permit2Deposit,
     hash: permit2DepositHash,
@@ -77,15 +78,6 @@ export function DepositForm() {
 
   // Whether user has approved Permit2
   const hasPermit2Allowance = permit2Allowance !== undefined && (permit2Allowance as bigint) > 0n;
-
-  // Generate a random nonce for Permit2
-  const generateNonce = (): bigint => {
-    // Use timestamp (seconds) shifted left by 8 bits + random byte (0-255)
-    // This creates practically unique nonces for Permit2's bitmap system
-    const timestamp = BigInt(Math.floor(Date.now() / 1000));
-    const randomBits = BigInt(Math.floor(Math.random() * 256));
-    return (timestamp << 8n) | randomBits;
-  };
 
   // Start approve activity
   const handleApprove = () => {
@@ -116,13 +108,17 @@ export function DepositForm() {
   // Start Permit2 deposit activity (sign + submit)
   const handlePermit2Deposit = async () => {
     if (!amount || isNaN(Number(amount)) || !address) return;
+
+    // 先刷新 nonce bitmap
+    await refetchNonce();
+    const nonce = getNextNonce();
+
     const id = addActivity({ type: 'deposit', status: 'pending', amount, message: 'Signing Permit2 message...' });
     setPermit2DepositId(id);
     processedPermit2DepositSuccess.current = false;
 
     const amountBigInt = parseTokenAmount(amount);
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour from now
-    const nonce = generateNonce();
     setPermit2Deadline(deadline);
     setPermit2Nonce(nonce);
 

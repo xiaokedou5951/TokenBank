@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from 'react';
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useSignTypedData, useChainId } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
-import { myTokenAbi, TOKEN_ADDRESS, TOKENBANK_ADDRESS, PERMIT2_ADDRESS } from '@/lib/contracts';
+import { myTokenAbi, permit2Abi, TOKEN_ADDRESS, TOKENBANK_ADDRESS, PERMIT2_ADDRESS } from '@/lib/contracts';
 import { parseTokenAmount } from '@/lib/utils';
 
 export function useTokenBalance(address: `0x${string}` | undefined) {
@@ -119,6 +119,40 @@ export function useApprovePermit2() {
   };
 }
 
+// 读取 Permit2 nonceBitmap 并找到下一个可用 nonce
+export function usePermit2Nonce(address: `0x${string}` | undefined) {
+  // 读取 word index = 0 的 bitmap
+  const { data: bitmap, refetch } = useReadContract({
+    address: PERMIT2_ADDRESS,
+    abi: permit2Abi,
+    functionName: 'nonceBitmap',
+    args: address ? [address, 0n] : undefined,
+    query: {
+      enabled: !!address,
+    },
+  });
+
+  const getNextNonce = (): bigint => {
+    // bitmap 中为 0 的位表示可用 nonce
+    const bitmapValue = (bitmap as bigint) ?? 0n;
+    // 找到最低的 0 位（第一个可用位）
+    for (let i = 0; i < 256; i++) {
+      if (!(bitmapValue & (1n << BigInt(i)))) {
+        // nonce = (wordIndex << 8) | bitPosition
+        return BigInt(i);
+      }
+    }
+    // 如果 word 0 的所有位都用了，使用 word 1（极端情况）
+    return 256n;
+  };
+
+  return {
+    bitmap,
+    getNextNonce,
+    refetchNonce: refetch,
+  };
+}
+
 // 生成 Permit2 EIP-712 签名
 export function usePermit2Signature() {
   const { signTypedDataAsync, data: signature, isPending, error, reset } = useSignTypedData();
@@ -128,7 +162,6 @@ export function usePermit2Signature() {
     async (tokenAddress: `0x${string}`, amount: bigint, nonce: bigint, deadline: bigint) => {
       const domain = {
         name: 'Permit2',
-        version: '0',
         chainId,
         verifyingContract: PERMIT2_ADDRESS,
       };
@@ -136,6 +169,7 @@ export function usePermit2Signature() {
       const types = {
         PermitTransferFrom: [
           { name: 'permitted', type: 'TokenPermissions' },
+          { name: 'spender', type: 'address' },
           { name: 'nonce', type: 'uint256' },
           { name: 'deadline', type: 'uint256' },
         ],
@@ -150,6 +184,7 @@ export function usePermit2Signature() {
           token: tokenAddress,
           amount,
         },
+        spender: TOKENBANK_ADDRESS,
         nonce,
         deadline,
       };
