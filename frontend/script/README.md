@@ -31,24 +31,26 @@ cd frontend/script && ./deploy-local.sh
 ### 执行流程
 
 1. 检查 `forge` 命令和 `contracts/.env` 是否可用
-2. 在 `contracts/` 目录下执行 `forge script script/Deploy.s.sol --rpc-url local --broadcast`
-3. 从部署输出中解析合约地址（去除 ANSI 颜色码后匹配）
-4. 更新 `frontend/.env.local` 中的以下字段：
+2. **部署 Permit2** — 执行 `forge script script/DeployPermit2.s.sol --rpc-url local --broadcast`
+3. 从部署输出中解析 Permit2 地址，写入 `contracts/.env` 的 `PERMIT2_ADDRESS`
+4. **部署 MyToken + TokenBankPermit2** — 执行 `forge script script/Deploy.s.sol --rpc-url local --broadcast`（从 `contracts/.env` 读取 `PERMIT2_ADDRESS`）
+5. 从部署输出中解析合约地址（去除 ANSI 颜色码后匹配）
+6. 更新 `frontend/.env.local` 中的以下字段：
 
 | 环境变量 | 合约 |
 |----------|------|
-| `NEXT_PUBLIC_TOKEN_ADDRESS` | MyTokenPermit |
+| `NEXT_PUBLIC_TOKEN_ADDRESS` | MyToken |
 | `NEXT_PUBLIC_TOKENBANK_ADDRESS` | TokenBankPermit2 |
-| `NEXT_PUBLIC_PERMIT2_ADDRESS` | Permit2（本地部署） |
+| `NEXT_PUBLIC_PERMIT2_ADDRESS` | Permit2 |
 | `NEXT_PUBLIC_RPC_URL` | 重置为 `http://127.0.0.1:8545` |
 | `NEXT_PUBLIC_CHAIN_ID` | 重置为 `31337` |
 
 ### 地址解析策略
 
-Permit2 合约通过 `assembly create` 在 `vm.startBroadcast` 之外部署，不会出现在 forge 的 broadcast JSON 中，因此脚本优先从 stdout 提取地址：
+脚本优先从 forge stdout 提取地址，失败时从 broadcast JSON 补充：
 
-1. **grep 解析 forge stdout** — 从 `console.log` 输出提取所有合约地址（最可靠，唯一能获取 Permit2 地址的方式）
-2. **jq 解析 broadcast JSON** — 仅当 MyTokenPermit / TokenBankPermit2 地址未从 stdout 提取到时补充
+1. **grep 解析 forge stdout** — 从 `console.log` 输出提取合约地址（去除 ANSI 颜色码后匹配）
+2. **jq 解析 broadcast JSON** — 仅当地址未从 stdout 提取到时补充
 3. **grep 解析 broadcast JSON** — jq 不可用时的兜底
 
 ### 关于本地部署地址固定不变
@@ -59,4 +61,4 @@ Permit2 合约通过 `assembly create` 在 `vm.startBroadcast` 之外部署，�
 - `CREATE` 操作码的地址由 `keccak256(rlp([sender, nonce]))` 决定
 - 相同部署者 + 相同 nonce = 相同地址
 
-部署顺序：nonce 0 → Permit2 → nonce 1 → MyTokenPermit → nonce 2 → TokenBankPermit2
+部署顺序：nonce 0 → Permit2 → nonce 1 → MyToken → nonce 2 → TokenBankPermit2

@@ -6,10 +6,10 @@
 
 ## 2. 关键结论
 
-- TokenBank 是一个去中心化的 ERC20 代币存取 DApp，支持 EIP-2612 Permit 签名存款。
+- TokenBank 是一个去中心化的 ERC20 代币存取 DApp，支持 **Uniswap Permit2** 签名存款。
 - 系统由两层构成：**链上智能合约层** + **Next.js 前端层**。
-- 合约层包含 `MyTokenPermit`（支持 EIP-2612 的 ERC20 代币）和 `TokenBankPermit`（支持 Permit 存款的银行合约）。
-- 前端提供两种存款方式：传统 Approve+Deposit（两步）和 Permit Deposit（一步签名存款）。
+- 合约层包含 `MyToken`（支持 EIP-2612 的 ERC20 代币）、`TokenBankPermit2`（支持 Permit2 存款的银行合约）和 **Uniswap Permit2** 合约（独立部署）。
+- 前端提供两种存款方式：传统 Approve+Deposit（两步）和 Permit2 Deposit（一步签名存款）。
 - 当前仅支持单代币和单一 Bank 合约，无后端服务。
 
 ## 3. 文档导航
@@ -26,7 +26,8 @@
 | 层级 | 技术 |
 |------|------|
 | 智能合约 | Solidity ^0.8.30，OpenZeppelin，Foundry |
-| 部署与测试 | Foundry Forge / Anvil，Deploy.s.sol |
+| 签名授权 | **Uniswap Permit2** (EIP-712 签名转账) |
+| 部署与测试 | Foundry Forge / Anvil，DeployPermit2.s.sol（独立部署 Permit2），Deploy.s.sol（部署 MyToken + TokenBankPermit2） |
 | 前端框架 | Next.js 16 (App Router + Turbopack)，React 19 |
 | 类型与样式 | TypeScript，Tailwind CSS 4 |
 | Web3 交互 | Wagmi v2，Viem v2，RainbowKit |
@@ -36,4 +37,4 @@
 
 - [ ] 是否需要引入后端索引服务以支持历史交易查询？
 - [ ] 是否增加多链部署配置（目前仅本地 Anvil + Sepolia + Mainnet 配置）？
-- [ ] 是否在传统 Approve+Deposit 流程基础上默认推荐 Permit Deposit？
+- [ ] 是否在传统 Approve+Deposit 流程基础上默认推荐 Permit2 Deposit？

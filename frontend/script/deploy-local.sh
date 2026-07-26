@@ -1,6 +1,6 @@
 #!/bin/bash
 # 部署合约到本地 Anvil 网络，并将合约地址更新到 frontend/.env.local
-# 流程：1) 部署 Permit2  2) 更新 contracts/.env  3) 部署 MyTokenPermit + TokenBankPermit2  4) 更新 frontend/.env.local
+# 流程：1) 部署 Permit2  2) 更新 contracts/.env  3) 部署 MyToken + TokenBankPermit2  4) 更新 frontend/.env.local
 
 set -euo pipefail
 
@@ -98,8 +98,8 @@ log_info "Permit2 合约地址: $PERMIT2_ADDRESS"
 update_env "PERMIT2_ADDRESS" "$PERMIT2_ADDRESS" "$CONTRACTS_ENV"
 log_info "已更新 $CONTRACTS_ENV 中的 PERMIT2_ADDRESS"
 
-# === 3. 部署 MyTokenPermit + TokenBankPermit2 ===
-log_info "部署 MyTokenPermit 和 TokenBankPermit2 合约..."
+# === 3. 部署 MyToken + TokenBankPermit2 ===
+log_info "部署 MyToken 和 TokenBankPermit2 合约..."
 
 DEPLOY_OUTPUT=$(forge script script/Deploy.s.sol --rpc-url local --broadcast 2>&1) || {
     log_error "合约部署失败！"
@@ -109,7 +109,7 @@ DEPLOY_OUTPUT=$(forge script script/Deploy.s.sol --rpc-url local --broadcast 2>&
 
 echo "$DEPLOY_OUTPUT"
 
-TOKEN_ADDRESS=$(extract_address "$DEPLOY_OUTPUT" "MyTokenPermit deployed to:")
+TOKEN_ADDRESS=$(extract_address "$DEPLOY_OUTPUT" "MyToken deployed to:")
 TOKENBANK_ADDRESS=$(extract_address "$DEPLOY_OUTPUT" "TokenBankPermit2 deployed to:")
 
 # fallback: 从 broadcast JSON 解析
@@ -124,13 +124,13 @@ if [ -f "$BROADCAST_FILE" ] && { [ -z "$TOKEN_ADDRESS" ] || [ -z "$TOKENBANK_ADD
         while IFS=': ' read -r name addr; do
             addr=$(echo "$addr" | xargs)
             case "$name" in
-                *MyTokenPermit*)    [ -z "$TOKEN_ADDRESS" ] && TOKEN_ADDRESS="$addr" ;;
+                *MyToken*)    [ -z "$TOKEN_ADDRESS" ] && TOKEN_ADDRESS="$addr" ;;
                 *TokenBankPermit2*) [ -z "$TOKENBANK_ADDRESS" ] && TOKENBANK_ADDRESS="$addr" ;;
             esac
         done <<< "$ADDRESSES"
     fi
     # grep 兜底
-    [ -z "$TOKEN_ADDRESS" ] && TOKEN_ADDRESS=$(grep -o '"MyTokenPermit"[^}]*"address"[[:space:]]*:[[:space:]]*"[^"]*"' "$BROADCAST_FILE" | grep -o '0x[0-9a-fA-F]\{40\}' | head -1 || true)
+    [ -z "$TOKEN_ADDRESS" ] && TOKEN_ADDRESS=$(grep -o '"MyToken"[^}]*"address"[[:space:]]*:[[:space:]]*"[^"]*"' "$BROADCAST_FILE" | grep -o '0x[0-9a-fA-F]\{40\}' | head -1 || true)
     [ -z "$TOKENBANK_ADDRESS" ] && TOKENBANK_ADDRESS=$(grep -o '"TokenBankPermit2"[^}]*"address"[[:space:]]*:[[:space:]]*"[^"]*"' "$BROADCAST_FILE" | grep -o '0x[0-9a-fA-F]\{40\}' | head -1 || true)
 fi
 
@@ -143,7 +143,7 @@ if [ -z "$TOKEN_ADDRESS" ] || [ -z "$TOKENBANK_ADDRESS" ]; then
 fi
 
 log_info "解析到合约地址:"
-log_info "  MyTokenPermit:    $TOKEN_ADDRESS"
+log_info "  MyToken:          $TOKEN_ADDRESS"
 log_info "  TokenBankPermit2: $TOKENBANK_ADDRESS"
 log_info "  Permit2:          $PERMIT2_ADDRESS"
 

@@ -8,7 +8,7 @@
 
 - **合约部署方式**：使用 Foundry（forge script），部署脚本位于 [Deploy.s.sol](file:///Users/mac/work/2026/web3/TokenBank/contracts/script/Deploy.s.sol)
 - **部署输出格式**：forge script 通过 `console.log` 输出合约地址，格式如：
-  - `MyTokenPermit deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3`
+  - `MyToken deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3`
   - `TokenBankPermit2 deployed to: 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
   - `Permit2 deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3`
 - **目标 .env.local** 路径：`/Users/mac/work/2026/web3/TokenBank/frontend/.env.local`
@@ -35,7 +35,7 @@
 1. **检查前置条件**：确认 `forge` 命令可用、`contracts/.env` 存在
 2. **执行部署**：在 `contracts/` 目录下运行 `forge script script/Deploy.s.sol --rpc-url local --broadcast`
 3. **解析输出**：从 forge 部署输出中提取三个合约地址：
-   - `MyTokenPermit deployed to: <address>` → `NEXT_PUBLIC_TOKEN_ADDRESS`
+   - `MyToken deployed to: <address>` → `NEXT_PUBLIC_TOKEN_ADDRESS`
    - `TokenBankPermit2 deployed to: <address>` → `NEXT_PUBLIC_TOKENBANK_ADDRESS`
    - `Permit2 deployed to: <address>` → `NEXT_PUBLIC_PERMIT2_ADDRESS`
 4. **更新 .env.local**：使用 `sed` 替换对应的行，保留 `NEXT_PUBLIC_RPC_URL` 和 `NEXT_PUBLIC_CHAIN_ID` 不变

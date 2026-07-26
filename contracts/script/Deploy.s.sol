@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {Script, console} from "forge-std/Script.sol";
-import {MyTokenPermit} from "../src/MyToken.sol";
+import {MyToken} from "../src/MyToken.sol";
 import {TokenBankPermit2} from "../src/TokenBankPermit2.sol";
 
 contract Deploy is Script {
@@ -17,13 +17,13 @@ contract Deploy is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. 部署 MyTokenPermit 合约
-        MyTokenPermit myTokenPermit = new MyTokenPermit(initialSupply);
-        console.log("MyTokenPermit deployed to:", address(myTokenPermit));
+        // 1. 部署 MyToken 合约
+        MyToken myToken = new MyToken(initialSupply);
+        console.log("MyToken deployed to:", address(myToken));
 
         // 2. 部署 TokenBankPermit2 合约（依赖 Permit2 地址）
         TokenBankPermit2 tokenBankPermit2 = new TokenBankPermit2(
-            address(myTokenPermit),
+            address(myToken),
             permit2Address
         );
         console.log("TokenBankPermit2 deployed to:", address(tokenBankPermit2));

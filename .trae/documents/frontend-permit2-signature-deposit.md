@@ -12,7 +12,7 @@
 - 需要 Permit2 合约地址
 
 ### 前端侧（需要修改）
-- 当前使用 **EIP-2612 Permit**（MyTokenPermit 自带的 permit），调用 `permitDeposit(amount, deadline, v, r, s)`
+- 当前使用 **EIP-2612 Permit**（MyToken 自带的 permit），调用 `permitDeposit(amount, deadline, v, r, s)`
 - 这与合约的 `depositWithPermit2` 签名不匹配
 - 需要迁移到 **Permit2** 签名流程
 
@@ -91,7 +91,7 @@
 
 ## 验证步骤
 
-1. 启动 Anvil 本地链，部署合约（Permit2 + MyTokenPermit + TokenBankPermit2）
+1. 启动 Anvil 本地链，部署合约（Permit2 + MyToken + TokenBankPermit2）
 2. 启动前端 `npm run dev`
 3. 连接钱包，测试传统 Approve + Deposit 流程正常
 4. 测试 Permit2 存款流程:

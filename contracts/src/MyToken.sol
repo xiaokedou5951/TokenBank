@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
- * @title MyTokenPermit
+ * @title MyToken
  * @dev ERC20 Token with EIP-2612 Permit support for gasless approvals
  *
  * Features:
@@ -16,7 +16,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * - Burnable: Tokens can be burned
  * - Ownable: Only owner can mint
  */
-contract MyTokenPermit is ERC20, ERC20Burnable, Ownable {
+contract MyToken is ERC20, ERC20Burnable, Ownable {
     uint8 private _decimals;
 
     /**

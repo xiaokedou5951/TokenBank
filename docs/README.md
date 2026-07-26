@@ -2,7 +2,7 @@
 
 ## 项目简介
 
-TokenBank 是一个去中心化的 ERC20 代币存取 DApp，支持 EIP-2612 Permit 签名存款。系统由两层构成：链上智能合约层（MyTokenPermit + TokenBankPermit）和浏览器前端层（Next.js + Wagmi）。
+TokenBank 是一个去中心化的 ERC20 代币存取 DApp，支持 EIP-2612 Permit 签名存款。系统由两层构成：链上智能合约层（MyToken + TokenBankPermit）和浏览器前端层（Next.js + Wagmi）。
 
 ## 文档结构
 
