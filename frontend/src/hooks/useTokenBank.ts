@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
-import { tokenBankAbi, TOKENBANK_ADDRESS } from '@/lib/contracts';
+import { tokenBankAbi, TOKENBANK_ADDRESS, TOKEN_ADDRESS } from '@/lib/contracts';
 import { parseTokenAmount } from '@/lib/utils';
 
 export function useDepositBalance(address: `0x${string}` | undefined) {
@@ -26,10 +26,8 @@ export function useDeposit() {
     hash,
   });
 
-  // Combined error: write error (user rejected, simulation fail) or receipt error (on-chain revert)
   const error = writeError || receiptError || undefined;
 
-  // Invalidate balance queries when transaction confirms
   useEffect(() => {
     if (isSuccess && hash) {
       queryClient.invalidateQueries({ queryKey: ['readContract'] });
@@ -57,7 +55,8 @@ export function useDeposit() {
   };
 }
 
-export function usePermitDeposit() {
+// Permit2 签名存款
+export function usePermit2Deposit() {
   const queryClient = useQueryClient();
   const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
 
@@ -65,34 +64,42 @@ export function usePermitDeposit() {
     hash,
   });
 
-  // Combined error: write error (user rejected, simulation fail) or receipt error (on-chain revert)
   const error = writeError || receiptError || undefined;
 
-  // Invalidate balance queries when transaction confirms
   useEffect(() => {
     if (isSuccess && hash) {
       queryClient.invalidateQueries({ queryKey: ['readContract'] });
     }
   }, [isSuccess, hash, queryClient]);
 
-  const permitDeposit = (
-    amount: string,
+  const permit2Deposit = (
+    amount: bigint,
+    nonce: bigint,
     deadline: bigint,
-    v: number,
-    r: `0x${string}`,
-    s: `0x${string}`
+    owner: `0x${string}`,
+    signature: `0x${string}`
   ) => {
-    const amountBigInt = parseTokenAmount(amount);
     writeContract({
       address: TOKENBANK_ADDRESS,
       abi: tokenBankAbi,
-      functionName: 'permitDeposit',
-      args: [amountBigInt, deadline, v, r, s],
+      functionName: 'depositWithPermit2',
+      args: [
+        {
+          permitted: {
+            token: TOKEN_ADDRESS,
+            amount,
+          },
+          nonce,
+          deadline,
+        },
+        owner,
+        signature,
+      ],
     });
   };
 
   return {
-    permitDeposit,
+    permit2Deposit,
     hash,
     isPending,
     isConfirming,
@@ -110,10 +117,8 @@ export function useWithdraw() {
     hash,
   });
 
-  // Combined error: write error (user rejected, simulation fail) or receipt error (on-chain revert)
   const error = writeError || receiptError || undefined;
 
-  // Invalidate balance queries when transaction confirms
   useEffect(() => {
     if (isSuccess && hash) {
       queryClient.invalidateQueries({ queryKey: ['readContract'] });

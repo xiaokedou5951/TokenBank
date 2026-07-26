@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
-import { useApprove, useTokenAllowance, usePermitSignature, useTokenNonce } from '@/hooks/useToken';
-import { useDeposit, usePermitDeposit } from '@/hooks/useTokenBank';
-import { isUserRejectedError, getContractErrorMessage } from '@/lib/utils';
+import { useApprove, useTokenAllowance, usePermit2Allowance, useApprovePermit2, usePermit2Signature } from '@/hooks/useToken';
+import { useDeposit, usePermit2Deposit } from '@/hooks/useTokenBank';
+import { isUserRejectedError, getContractErrorMessage, parseTokenAmount } from '@/lib/utils';
 import { useActivity } from '@/components/web3/ActivityLog';
-import { TOKENBANK_ADDRESS } from '@/lib/contracts';
-import { parseTokenAmount } from '@/lib/utils';
+import { TOKENBANK_ADDRESS, TOKEN_ADDRESS } from '@/lib/contracts';
 
 export function DepositForm() {
   const { address } = useAccount();
@@ -35,34 +34,58 @@ export function DepositForm() {
   } = useDeposit();
   const { data: allowance } = useTokenAllowance(address);
 
-  // Permit deposit hooks
+  // Permit2 hooks
+  const { data: permit2Allowance } = usePermit2Allowance(address);
   const {
-    generatePermitSignature,
+    approvePermit2,
+    hash: approvePermit2Hash,
+    isPending: isApprovingPermit2,
+    isConfirming: isApprovePermit2Confirming,
+    isSuccess: approvePermit2Success,
+    error: approvePermit2Error,
+    reset: resetApprovePermit2,
+  } = useApprovePermit2();
+  const {
+    generatePermit2Signature,
     signature,
     isPending: isSigning,
     error: signError,
     reset: resetSign,
-  } = usePermitSignature();
-  const { data: nonce } = useTokenNonce(address);
+  } = usePermit2Signature();
   const {
-    permitDeposit,
-    hash: permitDepositHash,
-    isPending: isPermitDepositing,
-    isConfirming: isPermitDepositConfirming,
-    isSuccess: permitDepositSuccess,
-    error: permitDepositError,
-    reset: resetPermitDeposit,
-  } = usePermitDeposit();
+    permit2Deposit,
+    hash: permit2DepositHash,
+    isPending: isPermit2Depositing,
+    isConfirming: isPermit2DepositConfirming,
+    isSuccess: permit2DepositSuccess,
+    error: permit2DepositError,
+    reset: resetPermit2Deposit,
+  } = usePermit2Deposit();
 
   const [approveId, setApproveId] = useState<string | null>(null);
   const [depositId, setDepositId] = useState<string | null>(null);
-  const [permitDepositId, setPermitDepositId] = useState<string | null>(null);
-  const [permitDeadline, setPermitDeadline] = useState<bigint>(0n);
+  const [approvePermit2Id, setApprovePermit2Id] = useState<string | null>(null);
+  const [permit2DepositId, setPermit2DepositId] = useState<string | null>(null);
+  const [permit2Deadline, setPermit2Deadline] = useState<bigint>(0n);
+  const [permit2Nonce, setPermit2Nonce] = useState<bigint>(0n);
 
   // Track if we've processed a terminal state for the current transaction
   const processedApproveSuccess = useRef(false);
   const processedDepositSuccess = useRef(false);
-  const processedPermitDepositSuccess = useRef(false);
+  const processedApprovePermit2Success = useRef(false);
+  const processedPermit2DepositSuccess = useRef(false);
+
+  // Whether user has approved Permit2
+  const hasPermit2Allowance = permit2Allowance !== undefined && (permit2Allowance as bigint) > 0n;
+
+  // Generate a random nonce for Permit2
+  const generateNonce = (): bigint => {
+    // Use timestamp (seconds) shifted left by 8 bits + random byte (0-255)
+    // This creates practically unique nonces for Permit2's bitmap system
+    const timestamp = BigInt(Math.floor(Date.now() / 1000));
+    const randomBits = BigInt(Math.floor(Math.random() * 256));
+    return (timestamp << 8n) | randomBits;
+  };
 
   // Start approve activity
   const handleApprove = () => {
@@ -82,22 +105,31 @@ export function DepositForm() {
     deposit(amount);
   };
 
-  // Start permit deposit activity (one-tx deposit with signature)
-  const handlePermitDeposit = async () => {
-    if (!amount || isNaN(Number(amount)) || !address || nonce === undefined) return;
-    const id = addActivity({ type: 'deposit', status: 'pending', amount, message: 'Signing permit...' });
-    setPermitDepositId(id);
-    processedPermitDepositSuccess.current = false;
+  // Start Permit2 approve activity
+  const handleApprovePermit2 = () => {
+    const id = addActivity({ type: 'approve', status: 'pending', amount: '∞', message: 'Approving Permit2...' });
+    setApprovePermit2Id(id);
+    processedApprovePermit2Success.current = false;
+    approvePermit2();
+  };
+
+  // Start Permit2 deposit activity (sign + submit)
+  const handlePermit2Deposit = async () => {
+    if (!amount || isNaN(Number(amount)) || !address) return;
+    const id = addActivity({ type: 'deposit', status: 'pending', amount, message: 'Signing Permit2 message...' });
+    setPermit2DepositId(id);
+    processedPermit2DepositSuccess.current = false;
 
     const amountBigInt = parseTokenAmount(amount);
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour from now
-    setPermitDeadline(deadline);
+    const nonce = generateNonce();
+    setPermit2Deadline(deadline);
+    setPermit2Nonce(nonce);
 
     try {
-      await generatePermitSignature(address, TOKENBANK_ADDRESS, amountBigInt, nonce as bigint, deadline);
+      await generatePermit2Signature(TOKEN_ADDRESS, amountBigInt, nonce, deadline);
     } catch (err) {
-      // Error is surfaced via signError in the hook; nothing to do here
-      console.error('Permit signature failed:', err);
+      console.error('Permit2 signature failed:', err);
     }
   };
 
@@ -170,6 +202,35 @@ export function DepositForm() {
     }
   }, [depositSuccess, depositError, depositId, depositHash, updateActivity, resetDeposit]);
 
+  // Approve Permit2 success / error
+  useEffect(() => {
+    if (!approvePermit2Id || processedApprovePermit2Success.current) return;
+
+    if (isApprovePermit2Confirming && !approvePermit2Success && !approvePermit2Error) {
+      updateActivity(approvePermit2Id, { status: 'pending', message: 'Waiting for on-chain confirmation…' });
+    }
+
+    if (approvePermit2Success) {
+      processedApprovePermit2Success.current = true;
+      updateActivity(approvePermit2Id, { status: 'success', message: 'Permit2 approved', txHash: approvePermit2Hash });
+      setApprovePermit2Id(null);
+      const timer = setTimeout(() => resetApprovePermit2(), 2000);
+      return () => clearTimeout(timer);
+    }
+
+    if (approvePermit2Error) {
+      processedApprovePermit2Success.current = true;
+      if (isUserRejectedError(approvePermit2Error)) {
+        updateActivity(approvePermit2Id, { status: 'error', message: 'Cancelled in wallet' });
+      } else {
+        updateActivity(approvePermit2Id, { status: 'error', message: getContractErrorMessage(approvePermit2Error) });
+      }
+      setApprovePermit2Id(null);
+      const timer = setTimeout(() => resetApprovePermit2(), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [approvePermit2Success, approvePermit2Error, approvePermit2Id, approvePermit2Hash, isApprovePermit2Confirming, updateActivity, resetApprovePermit2]);
+
   // Reset success trackers when a new transaction starts
   useEffect(() => {
     if (isApproving || isApproveConfirming) processedApproveSuccess.current = false;
@@ -180,76 +241,75 @@ export function DepositForm() {
   }, [isDepositing, isDepositConfirming]);
 
   useEffect(() => {
-    if (isPermitDepositing || isPermitDepositConfirming) processedPermitDepositSuccess.current = false;
-  }, [isPermitDepositing, isPermitDepositConfirming]);
+    if (isApprovingPermit2 || isApprovePermit2Confirming) processedApprovePermit2Success.current = false;
+  }, [isApprovingPermit2, isApprovePermit2Confirming]);
 
-  // When signature is ready, extract v,r,s and call permitDeposit
   useEffect(() => {
-    if (!signature || !permitDepositId || !address || nonce === undefined || permitDeadline === 0n) return;
+    if (isPermit2Depositing || isPermit2DepositConfirming) processedPermit2DepositSuccess.current = false;
+  }, [isPermit2Depositing, isPermit2DepositConfirming]);
 
-    // Extract v, r, s from signature (65 bytes: r[32] + s[32] + v[1])
-    const sig = signature.slice(2); // remove 0x
-    const r = `0x${sig.slice(0, 64)}` as `0x${string}`;
-    const s = `0x${sig.slice(64, 128)}` as `0x${string}`;
-    const v = parseInt(sig.slice(128, 130), 16);
-
-    updateActivity(permitDepositId, { message: 'Submitting deposit transaction...' });
-    permitDeposit(amount, permitDeadline, v, r, s);
-    resetSign(); // Clear signature after use
-  }, [signature, permitDepositId, address, nonce, amount, permitDeadline, permitDeposit, updateActivity, resetSign]);
-
-  // Update permit deposit activity as it progresses
+  // When Permit2 signature is ready, call depositWithPermit2
   useEffect(() => {
-    if (!permitDepositId) return;
+    if (!signature || !permit2DepositId || !address || permit2Deadline === 0n) return;
 
-    if (isPermitDepositConfirming && !permitDepositSuccess && !permitDepositError) {
-      updateActivity(permitDepositId, { status: 'pending', message: 'Waiting for on-chain confirmation…' });
+    const amountBigInt = parseTokenAmount(amount);
+    updateActivity(permit2DepositId, { message: 'Submitting deposit transaction...' });
+    permit2Deposit(amountBigInt, permit2Nonce, permit2Deadline, address, signature);
+    resetSign();
+  }, [signature, permit2DepositId, address, amount, permit2Deadline, permit2Nonce, permit2Deposit, updateActivity, resetSign]);
+
+  // Update Permit2 deposit activity as it progresses
+  useEffect(() => {
+    if (!permit2DepositId) return;
+
+    if (isPermit2DepositConfirming && !permit2DepositSuccess && !permit2DepositError) {
+      updateActivity(permit2DepositId, { status: 'pending', message: 'Waiting for on-chain confirmation…' });
     }
-  }, [isPermitDepositConfirming, permitDepositSuccess, permitDepositError, permitDepositId, updateActivity]);
+  }, [isPermit2DepositConfirming, permit2DepositSuccess, permit2DepositError, permit2DepositId, updateActivity]);
 
-  // Permit deposit success / error
+  // Permit2 deposit success / error
   useEffect(() => {
-    if (!permitDepositId || processedPermitDepositSuccess.current) return;
+    if (!permit2DepositId || processedPermit2DepositSuccess.current) return;
 
-    if (permitDepositSuccess) {
-      processedPermitDepositSuccess.current = true;
-      updateActivity(permitDepositId, { status: 'success', message: 'Deposited to TokenBank (Permit)', txHash: permitDepositHash });
+    if (permit2DepositSuccess) {
+      processedPermit2DepositSuccess.current = true;
+      updateActivity(permit2DepositId, { status: 'success', message: 'Deposited to TokenBank (Permit2)', txHash: permit2DepositHash });
       setAmount('');
-      setPermitDepositId(null);
-      const timer = setTimeout(() => resetPermitDeposit(), 2000);
+      setPermit2DepositId(null);
+      const timer = setTimeout(() => resetPermit2Deposit(), 2000);
       return () => clearTimeout(timer);
     }
 
-    if (permitDepositError) {
-      processedPermitDepositSuccess.current = true;
-      if (isUserRejectedError(permitDepositError)) {
-        updateActivity(permitDepositId, { status: 'error', message: 'Cancelled in wallet' });
+    if (permit2DepositError) {
+      processedPermit2DepositSuccess.current = true;
+      if (isUserRejectedError(permit2DepositError)) {
+        updateActivity(permit2DepositId, { status: 'error', message: 'Cancelled in wallet' });
       } else {
-        updateActivity(permitDepositId, { status: 'error', message: getContractErrorMessage(permitDepositError) });
+        updateActivity(permit2DepositId, { status: 'error', message: getContractErrorMessage(permit2DepositError) });
       }
-      setPermitDepositId(null);
-      const timer = setTimeout(() => resetPermitDeposit(), 2000);
+      setPermit2DepositId(null);
+      const timer = setTimeout(() => resetPermit2Deposit(), 2000);
       return () => clearTimeout(timer);
     }
-  }, [permitDepositSuccess, permitDepositError, permitDepositId, permitDepositHash, updateActivity, resetPermitDeposit]);
+  }, [permit2DepositSuccess, permit2DepositError, permit2DepositId, permit2DepositHash, updateActivity, resetPermit2Deposit]);
 
   // Handle signature error
   useEffect(() => {
-    if (!signError || !permitDepositId) return;
-    processedPermitDepositSuccess.current = true;
+    if (!signError || !permit2DepositId) return;
+    processedPermit2DepositSuccess.current = true;
     if (isUserRejectedError(signError)) {
-      updateActivity(permitDepositId, { status: 'error', message: 'Signature cancelled' });
+      updateActivity(permit2DepositId, { status: 'error', message: 'Signature cancelled' });
     } else {
-      updateActivity(permitDepositId, { status: 'error', message: 'Failed to sign permit' });
+      updateActivity(permit2DepositId, { status: 'error', message: 'Failed to sign Permit2 message' });
     }
-    setPermitDepositId(null);
+    setPermit2DepositId(null);
     const timer = setTimeout(() => resetSign(), 2000);
     return () => clearTimeout(timer);
-  }, [signError, permitDepositId, updateActivity, resetSign]);
+  }, [signError, permit2DepositId, updateActivity, resetSign]);
 
   if (!address) return null;
 
-  const isProcessing = isApproving || isApproveConfirming || isDepositing || isDepositConfirming || isSigning || isPermitDepositing || isPermitDepositConfirming;
+  const isProcessing = isApproving || isApproveConfirming || isDepositing || isDepositConfirming || isSigning || isPermit2Depositing || isPermit2DepositConfirming || isApprovingPermit2 || isApprovePermit2Confirming;
   const hasAllowance = allowance !== undefined && (allowance as bigint) > 0n;
 
   // Surface the latest inline message from this form
@@ -329,6 +389,7 @@ export function DepositForm() {
         </div>
 
         <div className="space-y-3">
+          {/* Traditional Approve + Deposit */}
           <div className="flex gap-3">
             <button
               onClick={handleApprove}
@@ -366,31 +427,55 @@ export function DepositForm() {
             </button>
           </div>
 
-          <button
-            onClick={handlePermitDeposit}
-            disabled={!amount || isSigning || isPermitDepositing || isPermitDepositConfirming}
-            className="w-full bg-gradient-to-r from-[var(--ink-green)] to-[var(--copper)] text-white py-3 px-4 rounded-lg font-medium hover:opacity-90 disabled:bg-[var(--parchment)] disabled:text-[var(--ink-muted)] disabled:from-[var(--parchment)] disabled:to-[var(--parchment)] flex items-center justify-center gap-2"
-          >
-            {isPermitDepositConfirming ? (
-              <>
-                <Spinner /> Confirming
-              </>
-            ) : isPermitDepositing ? (
-              <>
-                <Spinner /> Submitting
-              </>
-            ) : isSigning ? (
-              <>
-                <Spinner /> Signing
-              </>
+          {/* Permit2 Deposit Section */}
+          <div className="border-t border-[var(--border)] pt-3">
+            {!hasPermit2Allowance ? (
+              <button
+                onClick={handleApprovePermit2}
+                disabled={isApprovingPermit2 || isApprovePermit2Confirming}
+                className="w-full bg-[var(--copper)]/80 text-white py-3 px-4 rounded-lg font-medium hover:bg-[var(--copper)] disabled:bg-[var(--parchment)] disabled:text-[var(--ink-muted)] flex items-center justify-center gap-2"
+              >
+                {isApprovePermit2Confirming ? (
+                  <>
+                    <Spinner /> Confirming
+                  </>
+                ) : isApprovingPermit2 ? (
+                  <>
+                    <Spinner /> Pending
+                  </>
+                ) : (
+                  'Approve Permit2 (One-time)'
+                )}
+              </button>
             ) : (
-              '🚀 Permit Deposit (One-Click)'
+              <button
+                onClick={handlePermit2Deposit}
+                disabled={!amount || isSigning || isPermit2Depositing || isPermit2DepositConfirming}
+                className="w-full bg-gradient-to-r from-[var(--ink-green)] to-[var(--copper)] text-white py-3 px-4 rounded-lg font-medium hover:opacity-90 disabled:bg-[var(--parchment)] disabled:text-[var(--ink-muted)] disabled:from-[var(--parchment)] disabled:to-[var(--parchment)] flex items-center justify-center gap-2"
+              >
+                {isPermit2DepositConfirming ? (
+                  <>
+                    <Spinner /> Confirming
+                  </>
+                ) : isPermit2Depositing ? (
+                  <>
+                    <Spinner /> Submitting
+                  </>
+                ) : isSigning ? (
+                  <>
+                    <Spinner /> Signing
+                  </>
+                ) : (
+                  '🚀 Permit2 Deposit (One-Click)'
+                )}
+              </button>
             )}
-          </button>
-
-          <p className="text-xs text-[var(--ink-muted)] text-center">
-            Permit Deposit: Sign a message to deposit in one transaction (no approve needed)
-          </p>
+            <p className="text-xs text-[var(--ink-muted)] text-center mt-2">
+              {hasPermit2Allowance
+                ? 'Permit2 Deposit: Sign a message to deposit in one transaction (no approve needed)'
+                : 'First, approve Permit2 contract to manage your tokens (one-time setup)'}
+            </p>
+          </div>
         </div>
 
         {/* Inline status / error */}
