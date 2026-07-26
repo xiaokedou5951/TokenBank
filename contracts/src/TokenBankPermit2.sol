@@ -2,44 +2,46 @@
 pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./IPermit2.sol";
 
 /**
- * @title TokenBankPermit
- * @dev Token Bank with EIP-2612 Permit support for gasless deposits
+ * @title TokenBankPermit2
+ * @dev Token Bank with Permit2 support for gasless signature-based deposits
  *
  * Features:
  * - Traditional deposit/withdraw (with approve)
- * - permitDeposit: Deposit using EIP-2612 signature (no separate approve tx needed)
+ * - depositWithPermit2: Deposit using Permit2 signature (no separate approve tx needed)
  * - ReentrancyGuard: Protection against reentrancy attacks
  */
-contract TokenBankPermit is ReentrancyGuard {
+contract TokenBankPermit2 is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // Custom errors (gas-efficient)
     error ZeroAmount();
     error ZeroAddress();
     error InsufficientBalance();
-    error PermitFailed();
 
     // State variables
     IERC20 public immutable token;
+    IPermit2 public immutable permit2;
     mapping(address => uint256) public balances;
 
     // Events
     event Deposit(address indexed user, uint256 amount);
-    event PermitDeposit(address indexed user, uint256 amount);
+    event Permit2Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
 
     /**
      * @dev Constructor
      * @param _token Address of the ERC20 token to be used
+     * @param _permit2 Address of the Permit2 contract
      */
-    constructor(address _token) {
-        if (_token == address(0)) revert ZeroAddress();
+    constructor(address _token, address _permit2) {
+        if (_token == address(0) || _permit2 == address(0)) revert ZeroAddress();
         token = IERC20(_token);
+        permit2 = IPermit2(_permit2);
     }
 
     /**
@@ -56,43 +58,39 @@ contract TokenBankPermit is ReentrancyGuard {
     }
 
     /**
-     * @dev Deposit using EIP-2612 permit signature
-     * @param amount Amount of tokens to deposit
-     * @param deadline Timestamp until which the signature is valid
-     * @param v ECDSA signature parameter
-     * @param r ECDSA signature parameter
-     * @param s ECDSA signature parameter
+     * @dev Deposit using Permit2 signature
+     * @param permitTransfer The permit data signed by the user
+     * @param owner The owner of the tokens (signer)
+     * @param signature The EIP-712 signature
      *
      * This function allows users to deposit in a single transaction without
-     * a separate approve transaction, using an off-chain signature.
+     * a separate approve transaction, using Permit2 signature.
      */
-    function permitDeposit(
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
+    function depositWithPermit2(
+        IPermit2.PermitTransferFrom calldata permitTransfer,
+        address owner,
+        bytes calldata signature
     ) external nonReentrant {
-        if (amount == 0) revert ZeroAmount();
+        if (permitTransfer.permitted.amount == 0) revert ZeroAmount();
+        if (permitTransfer.permitted.token != address(token)) revert("Invalid token");
 
-        // Call permit on the token contract
-        try IERC20Permit(address(token)).permit(
-            msg.sender,
-            address(this),
-            amount,
-            deadline,
-            v,
-            r,
-            s
-        ) {
-            // Permit succeeded, now transfer tokens
-            token.safeTransferFrom(msg.sender, address(this), amount);
-            balances[msg.sender] += amount;
+        // Use Permit2 to transfer tokens from owner to this contract
+        IPermit2.SignatureTransferDetails memory transferDetails = IPermit2.SignatureTransferDetails({
+            to: address(this),
+            requestedAmount: permitTransfer.permitted.amount
+        });
 
-            emit PermitDeposit(msg.sender, amount);
-        } catch {
-            revert PermitFailed();
-        }
+        permit2.permitTransferFrom(
+            permitTransfer,
+            transferDetails,
+            owner,
+            signature
+        );
+
+        // Update balance
+        balances[owner] += permitTransfer.permitted.amount;
+
+        emit Permit2Deposit(owner, permitTransfer.permitted.amount);
     }
 
     /**

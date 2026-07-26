@@ -16,7 +16,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * - Burnable: Tokens can be burned
  * - Ownable: Only owner can mint
  */
-contract MyTokenPermit is ERC20, ERC20Permit, ERC20Burnable, Ownable {
+contract MyTokenPermit is ERC20, ERC20Burnable, Ownable {
     uint8 private _decimals;
 
     /**
@@ -24,8 +24,7 @@ contract MyTokenPermit is ERC20, ERC20Permit, ERC20Burnable, Ownable {
      * @param initialSupply Initial token supply (in whole tokens, will be multiplied by 10^18)
      */
     constructor(uint256 initialSupply)
-        ERC20("MyTokenPermit", "MTKP")
-        ERC20Permit("MyTokenPermit")
+        ERC20("MyToken", "MTK")
         Ownable(msg.sender)
     {
         _decimals = 18;
