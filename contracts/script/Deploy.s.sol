@@ -13,13 +13,10 @@ contract Deploy is Script {
         address deployerAddress = vm.addr(deployerPrivateKey);
         console.log("Deployer address:", deployerAddress);
 
-        // 判断是否需要本地部署 Permit2（非本地网络使用已部署的地址）
-        address permit2Address = vm.envOr("PERMIT2_ADDRESS", address(0));
-
-        vm.startBroadcast(deployerPrivateKey);
-
-        // 1. 本地网络部署 Permit2 合约，其他网络使用已部署地址
-        if (permit2Address == address(0)) {
+        // 根据 chainId 判断网络：本地网络部署 Permit2，其他网络使用已部署地址
+        address permit2Address;
+        if (block.chainid == 31337) {
+            // 本地网络（Anvil/Hardhat），部署 Permit2
             bytes memory permit2Bytecode = vm.parseBytes(vm.readFile("permit2-bytecode.txt"));
             assembly {
                 permit2Address := create(0, add(permit2Bytecode, 0x20), mload(permit2Bytecode))
@@ -27,8 +24,12 @@ contract Deploy is Script {
             require(permit2Address != address(0), "Permit2 deployment failed");
             console.log("Permit2 deployed to:", permit2Address);
         } else {
+            // 其他网络，从环境变量读取已部署地址
+            permit2Address = vm.envAddress("PERMIT2_ADDRESS");
             console.log("Using existing Permit2 at:", permit2Address);
         }
+
+        vm.startBroadcast(deployerPrivateKey);
 
         // 2. 部署 MyTokenPermit 合约
         MyTokenPermit myTokenPermit = new MyTokenPermit(initialSupply);
