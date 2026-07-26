@@ -58,50 +58,39 @@ TOKEN_ADDRESS=""
 TOKENBANK_ADDRESS=""
 PERMIT2_ADDRESS=""
 
+# 策略：优先从 forge stdout 提取所有地址（最可靠）
+# 原因：Permit2 通过 assembly create 在 vm.startBroadcast 之外部署，
+# 不会出现在 broadcast JSON 中，只能从 console.log 输出获取
+log_info "从部署输出提取合约地址..."
+
+# 去除 ANSI 颜色码后再匹配，避免格式干扰
+CLEAN_OUTPUT=$(echo "$DEPLOY_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')
+
+TOKEN_ADDRESS=$(echo "$CLEAN_OUTPUT" | grep -oE 'MyTokenPermit deployed to: 0x[0-9a-fA-F]{40}' | grep -oE '0x[0-9a-fA-F]{40}' | head -1 || true)
+TOKENBANK_ADDRESS=$(echo "$CLEAN_OUTPUT" | grep -oE 'TokenBankPermit2 deployed to: 0x[0-9a-fA-F]{40}' | grep -oE '0x[0-9a-fA-F]{40}' | head -1 || true)
+PERMIT2_ADDRESS=$(echo "$CLEAN_OUTPUT" | grep -oE 'Permit2 deployed to: 0x[0-9a-fA-F]{40}' | grep -oE '0x[0-9a-fA-F]{40}' | head -1 || true)
+
+# fallback: 从 broadcast JSON 补充 MyTokenPermit 和 TokenBankPermit2
 if [ -f "$BROADCAST_FILE" ]; then
-    # 使用 jq 解析（如果可用），否则用 grep
-    if command -v jq &>/dev/null; then
-        # 从 transactions 数组中提取合约创建的地址
-        # forge broadcast JSON 的 contracts 字段包含部署的合约信息
-        ADDRESSES=$(jq -r '.contracts[] | "\(.contractName): \(.address)"' "$BROADCAST_FILE" 2>/dev/null || true)
-
-        if [ -z "$ADDRESSES" ]; then
-            # fallback: 从 transactions 中提取 create 类型的交易
-            ADDRESSES=$(jq -r '.transactions[] | select(.transactionType == "CREATE") | "\(.contractName // "Unknown"): \(.contractAddress)"' "$BROADCAST_FILE" 2>/dev/null || true)
+    if [ -z "$TOKEN_ADDRESS" ] || [ -z "$TOKENBANK_ADDRESS" ]; then
+        log_info "stdout 解析不完整，尝试从 broadcast JSON 补充..."
+        if command -v jq &>/dev/null; then
+            ADDRESSES=$(jq -r '.contracts[] | "\(.contractName): \(.address)"' "$BROADCAST_FILE" 2>/dev/null || true)
+            if [ -z "$ADDRESSES" ]; then
+                ADDRESSES=$(jq -r '.transactions[] | select(.transactionType == "CREATE") | "\(.contractName // "Unknown"): \(.contractAddress)"' "$BROADCAST_FILE" 2>/dev/null || true)
+            fi
+            while IFS=': ' read -r name addr; do
+                addr=$(echo "$addr" | xargs)
+                case "$name" in
+                    *MyTokenPermit*)    [ -z "$TOKEN_ADDRESS" ] && TOKEN_ADDRESS="$addr" ;;
+                    *TokenBankPermit2*) [ -z "$TOKENBANK_ADDRESS" ] && TOKENBANK_ADDRESS="$addr" ;;
+                esac
+            done <<< "$ADDRESSES"
         fi
-
-        while IFS=': ' read -r name addr; do
-            addr=$(echo "$addr" | xargs) # trim
-            case "$name" in
-                *MyTokenPermit*)  TOKEN_ADDRESS="$addr" ;;
-                *TokenBankPermit2*) TOKENBANK_ADDRESS="$addr" ;;
-                *Permit2*)        PERMIT2_ADDRESS="$addr" ;;
-            esac
-        done <<< "$ADDRESSES"
+        # grep 兜底
+        [ -z "$TOKEN_ADDRESS" ] && TOKEN_ADDRESS=$(grep -o '"MyTokenPermit"[^}]*"address"[[:space:]]*:[[:space:]]*"[^"]*"' "$BROADCAST_FILE" | grep -o '0x[0-9a-fA-F]\{40\}' | head -1 || true)
+        [ -z "$TOKENBANK_ADDRESS" ] && TOKENBANK_ADDRESS=$(grep -o '"TokenBankPermit2"[^}]*"address"[[:space:]]*:[[:space:]]*"[^"]*"' "$BROADCAST_FILE" | grep -o '0x[0-9a-fA-F]\{40\}' | head -1 || true)
     fi
-
-    # 如果 jq 解析未获取到完整地址，用 grep 从 broadcast JSON 兜底
-    if [ -z "$TOKEN_ADDRESS" ]; then
-        TOKEN_ADDRESS=$(grep -o '"MyTokenPermit"[^}]*"address"[[:space:]]*:[[:space:]]*"[^"]*"' "$BROADCAST_FILE" | grep -o '0x[0-9a-fA-F]\{40\}' | head -1 || true)
-    fi
-    if [ -z "$TOKENBANK_ADDRESS" ]; then
-        TOKENBANK_ADDRESS=$(grep -o '"TokenBankPermit2"[^}]*"address"[[:space:]]*:[[:space:]]*"[^"]*"' "$BROADCAST_FILE" | grep -o '0x[0-9a-fA-F]\{40\}' | head -1 || true)
-    fi
-    if [ -z "$PERMIT2_ADDRESS" ]; then
-        # Permit2 在 broadcast 中可能没有 contractName，尝试从 transactions 中提取
-        PERMIT2_ADDRESS=$(grep -o '"Permit2"[^}]*"address"[[:space:]]*:[[:space:]]*"[^"]*"' "$BROADCAST_FILE" | grep -o '0x[0-9a-fA-F]\{40\}' | head -1 || true)
-    fi
-fi
-
-# 最终 fallback: 从 forge 的 stdout 输出中 grep 地址
-if [ -z "$TOKEN_ADDRESS" ]; then
-    TOKEN_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep -oE 'MyTokenPermit deployed to: 0x[0-9a-fA-F]{40}' | grep -oE '0x[0-9a-fA-F]{40}' | head -1 || true)
-fi
-if [ -z "$TOKENBANK_ADDRESS" ]; then
-    TOKENBANK_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep -oE 'TokenBankPermit2 deployed to: 0x[0-9a-fA-F]{40}' | grep -oE '0x[0-9a-fA-F]{40}' | head -1 || true)
-fi
-if [ -z "$PERMIT2_ADDRESS" ]; then
-    PERMIT2_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep -oE 'Permit2 deployed to: 0x[0-9a-fA-F]{40}' | grep -oE '0x[0-9a-fA-F]{40}' | head -1 || true)
 fi
 
 # 校验地址
