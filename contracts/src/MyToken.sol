@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 /**
  * @title MyToken
@@ -15,8 +16,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * - EIP-2612 Permit: Off-chain approval signatures
  * - Burnable: Tokens can be burned
  * - Ownable: Only owner can mint
+ * - ERC165: Standard interface detection
  */
-contract MyToken is ERC20, ERC20Burnable, Ownable {
+contract MyToken is ERC20, ERC20Burnable, Ownable, ERC165 {
     uint8 private _decimals;
 
     /**
@@ -45,5 +47,16 @@ contract MyToken is ERC20, ERC20Burnable, Ownable {
      */
     function mint(address to, uint256 amount) public onlyOwner {
         _mint(to, amount);
+    }
+
+    /**
+     * @dev See {IERC165-supportsInterface}
+     * @param interfaceId The interface identifier
+     * @return bool True if the contract supports the interface
+     */
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return
+            interfaceId == type(IERC20).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
 }

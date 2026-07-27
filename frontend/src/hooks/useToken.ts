@@ -132,9 +132,9 @@ export function usePermit2Nonce(address: `0x${string}` | undefined) {
     },
   });
 
-  const getNextNonce = (): bigint => {
+  const getNextNonce = (bitmapOverride?: bigint): bigint => {
     // bitmap 中为 0 的位表示可用 nonce
-    const bitmapValue = (bitmap as bigint) ?? 0n;
+    const bitmapValue = bitmapOverride ?? (bitmap as bigint) ?? 0n;
     // 找到最低的 0 位（第一个可用位）
     for (let i = 0; i < 256; i++) {
       if (!(bitmapValue & (1n << BigInt(i)))) {
@@ -146,10 +146,17 @@ export function usePermit2Nonce(address: `0x${string}` | undefined) {
     return 256n;
   };
 
+  // 修复：refetchNonce 返回最新的 nonce
+  const refetchNonce = async (): Promise<bigint> => {
+    const result = await refetch();
+    const freshBitmap = result.data as bigint | undefined;
+    return getNextNonce(freshBitmap);
+  };
+
   return {
     bitmap,
     getNextNonce,
-    refetchNonce: refetch,
+    refetchNonce,
   };
 }
 
@@ -159,7 +166,7 @@ export function usePermit2Signature() {
   const chainId = useChainId();
 
   const generatePermit2Signature = useCallback(
-    async (tokenAddress: `0x${string}`, amount: bigint, nonce: bigint, deadline: bigint) => {
+    async (tokenAddress: `0x${string}`, amount: bigint, nonce: bigint, deadline: bigint): Promise<`0x${string}` | undefined> => {
       const domain = {
         name: 'Permit2',
         chainId,
@@ -189,7 +196,8 @@ export function usePermit2Signature() {
         deadline,
       };
 
-      await signTypedDataAsync({
+      // 修复：直接返回签名结果
+      return await signTypedDataAsync({
         domain,
         types,
         primaryType: 'PermitTransferFrom',

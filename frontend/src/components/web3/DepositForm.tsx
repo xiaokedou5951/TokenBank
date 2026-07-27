@@ -109,9 +109,8 @@ export function DepositForm() {
   const handlePermit2Deposit = async () => {
     if (!amount || isNaN(Number(amount)) || !address) return;
 
-    // 先刷新 nonce bitmap
-    await refetchNonce();
-    const nonce = getNextNonce();
+    // 修复：直接从 refetchNonce 获取最新 nonce
+    const nonce = await refetchNonce();
 
     const id = addActivity({ type: 'deposit', status: 'pending', amount, message: 'Signing Permit2 message...' });
     setPermit2DepositId(id);
@@ -123,9 +122,21 @@ export function DepositForm() {
     setPermit2Nonce(nonce);
 
     try {
-      await generatePermit2Signature(TOKEN_ADDRESS, amountBigInt, nonce, deadline);
+      // 修复：直接使用签名的返回值，不依赖 React 状态
+      const sig = await generatePermit2Signature(TOKEN_ADDRESS, amountBigInt, nonce, deadline);
+      // signTypedDataAsync 返回签名或 undefined
+      if (sig !== undefined) {
+        updateActivity(id, { message: 'Submitting deposit transaction...' });
+        permit2Deposit(amountBigInt, nonce, deadline, address, sig);
+      }
     } catch (err) {
       console.error('Permit2 signature failed:', err);
+      if (isUserRejectedError(err as Error)) {
+        updateActivity(id, { status: 'error', message: 'Signature cancelled' });
+      } else {
+        updateActivity(id, { status: 'error', message: 'Failed to sign Permit2 message' });
+      }
+      setPermit2DepositId(null);
     }
   };
 
@@ -245,6 +256,8 @@ export function DepositForm() {
   }, [isPermit2Depositing, isPermit2DepositConfirming]);
 
   // When Permit2 signature is ready, call depositWithPermit2
+  // 注释掉：现在直接在 handlePermit2Deposit 中使用签名返回值，避免 React 状态竞态条件
+  /*
   useEffect(() => {
     if (!signature || !permit2DepositId || !address || permit2Deadline === 0n) return;
 
@@ -253,6 +266,7 @@ export function DepositForm() {
     permit2Deposit(amountBigInt, permit2Nonce, permit2Deadline, address, signature);
     resetSign();
   }, [signature, permit2DepositId, address, amount, permit2Deadline, permit2Nonce, permit2Deposit, updateActivity, resetSign]);
+  */
 
   // Update Permit2 deposit activity as it progresses
   useEffect(() => {
@@ -272,6 +286,8 @@ export function DepositForm() {
       updateActivity(permit2DepositId, { status: 'success', message: 'Deposited to TokenBank (Permit2)', txHash: permit2DepositHash });
       setAmount('');
       setPermit2DepositId(null);
+      // 修复：deposit 成功后刷新 nonce bitmap，为下次 deposit 准备
+      refetchNonce().catch(console.error);
       const timer = setTimeout(() => resetPermit2Deposit(), 2000);
       return () => clearTimeout(timer);
     }
