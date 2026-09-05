@@ -28,9 +28,13 @@ export const config = getDefaultConfig({
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID',
   chains: [anvil, mainnet, sepolia],
   transports: {
-    [anvil.id]: http('http://127.0.0.1:8545'),
+    [anvil.id]: http(process.env.NEXT_PUBLIC_RPC_URL || 'http://127.0.0.1:8545'),
     [mainnet.id]: http('https://rpc.ankr.com/eth'),
-    [sepolia.id]: http('https://rpc.ankr.com/eth_sepolia'),
+    // Public Sepolia RPC. Note: browser E2E of the EIP-7702 flow must use real
+    // Sepolia (MetaMask cannot add a local fork as a custom network — its
+    // chainId 11155111 collides with the built-in Sepolia). Local forks are
+    // only used for script-level verification (scripts/e2e-7702.mjs) via RPC_URL.
+    [sepolia.id]: http('https://ethereum-sepolia-rpc.publicnode.com'),
   },
   ssr: true,
 });

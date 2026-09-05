@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useTokenBalance, useTokenAllowance } from '@/hooks/useToken';
 import { useDepositBalance } from '@/hooks/useTokenBank';
+import { useDelegationStatus } from '@/hooks/use7702';
 import { formatTokenAmount } from '@/lib/utils';
 
 export function BalanceCard() {
@@ -12,6 +13,7 @@ export function BalanceCard() {
   const { data: tokenBalance, isLoading: isLoadingToken } = useTokenBalance(address);
   const { data: depositBalance, isLoading: isLoadingDeposit } = useDepositBalance(address);
   const { data: allowance, isLoading: isLoadingAllowance } = useTokenAllowance(address);
+  const { data: delegation } = useDelegationStatus(address);
 
   const [pulsing, setPulsing] = useState(false);
   const prevTokenBalance = useRef<string | undefined>(undefined);
@@ -49,6 +51,14 @@ export function BalanceCard() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-[var(--ink-muted)]">Your Balances</h2>
         <div className="flex items-center gap-2">
+          {delegation?.delegated && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-[var(--ink-green-bg)] text-[var(--ink-green)] border border-[var(--ink-green)]/20"
+              title={`EIP-7702 delegate: ${delegation.delegate}`}
+            >
+              Smart Account
+            </span>
+          )}
           <div className="w-2 h-2 rounded-full bg-[var(--ink-green)] animate-pulse" />
           <span className="text-xs text-[var(--ink-muted)]">Connected</span>
         </div>

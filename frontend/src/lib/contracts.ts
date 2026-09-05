@@ -1,4 +1,4 @@
-import { type Address } from 'viem';
+import { type Address, encodeFunctionData, encodeAbiParameters } from 'viem';
 
 // MyToken ABI (includes ERC20Permit)
 export const myTokenAbi = [
@@ -165,3 +165,76 @@ export const TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_TOKEN_ADDRESS ||
 
 export const TOKENBANK_ADDRESS = (process.env.NEXT_PUBLIC_TOKENBANK_ADDRESS ||
   '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512') as Address;
+
+// ── EIP-7702 / MetaMask Delegator ─────────────────────────────────────────────
+
+/**
+ * MetaMask official EIP-7702 Delegator (EIP7702StatelessDeleGator).
+ * Deployed at the same address on mainnet, Sepolia and other supported chains.
+ */
+export const METAMASK_DELEGATOR_ADDRESS = '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B' as Address;
+
+/** EIP-7702 delegation designator prefix: user.code = 0xef0100 || delegate */
+export const EIP7702_DELEGATION_PREFIX = '0xef0100';
+
+/**
+ * ERC-7579 BatchDefault mode (callType 0x01 = batch call).
+ * Used by the MetaMask Delegator's execute() entrypoint.
+ */
+export const EXECUTION_MODE_BATCH_DEFAULT =
+  '0x0100000000000000000000000000000000000000000000000000000000000000';
+
+/** Minimal ABI of the MetaMask Delegator's ERC-7579 execute entrypoint */
+export const metamaskDelegatorAbi = [
+  {
+    type: 'function',
+    name: 'execute',
+    inputs: [
+      { name: '_mode', type: 'bytes32', internalType: 'ModeCode' },
+      { name: '_executionCalldata', type: 'bytes', internalType: 'bytes' },
+    ],
+    outputs: [],
+    stateMutability: 'payable',
+  },
+] as const;
+
+/** A single ERC-7579 Execution passed to the Delegator's execute() */
+export interface DelegatorCall {
+  to: Address;
+  data: `0x${string}`;
+  value?: bigint;
+}
+
+/**
+ * Build calldata for execute(BatchDefault, abi.encode(Execution[])) on the
+ * MetaMask Delegator. Used by the 7702 direct path (e2e script / local accounts):
+ * the EOA self-calls this calldata in a Type-0x04 transaction whose
+ * authorization_list delegates it to METAMASK_DELEGATOR_ADDRESS.
+ */
+export function buildExecutionBatchCalldata(calls: DelegatorCall[]): `0x${string}` {
+  const executions = calls.map((c) => ({
+    target: c.to,
+    value: c.value ?? 0n,
+    callData: c.data,
+  }));
+  return encodeFunctionData({
+    abi: metamaskDelegatorAbi,
+    functionName: 'execute',
+    args: [
+      EXECUTION_MODE_BATCH_DEFAULT,
+      encodeAbiParameters(
+        [
+          {
+            type: 'tuple[]',
+            components: [
+              { name: 'target', type: 'address' },
+              { name: 'value', type: 'uint256' },
+              { name: 'callData', type: 'bytes' },
+            ],
+          },
+        ],
+        [executions],
+      ),
+    ],
+  });
+}

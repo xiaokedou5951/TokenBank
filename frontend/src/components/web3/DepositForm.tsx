@@ -4,10 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { useApprove, useTokenAllowance, usePermitSignature, useTokenNonce } from '@/hooks/useToken';
 import { useDeposit, usePermitDeposit } from '@/hooks/useTokenBank';
+import { useDelegationStatus, useAtomicBatchCapability, use7702Deposit } from '@/hooks/use7702';
 import { isUserRejectedError, getContractErrorMessage } from '@/lib/utils';
 import { useActivity } from '@/components/web3/ActivityLog';
-import { TOKENBANK_ADDRESS } from '@/lib/contracts';
-import { parseTokenAmount } from '@/lib/utils';
+import { TOKENBANK_ADDRESS, METAMASK_DELEGATOR_ADDRESS } from '@/lib/contracts';
+import { parseTokenAmount, shortenAddress } from '@/lib/utils';
 
 export function DepositForm() {
   const { address } = useAccount();
@@ -59,6 +60,21 @@ export function DepositForm() {
   const [permitDepositId, setPermitDepositId] = useState<string | null>(null);
   const [permitDeadline, setPermitDeadline] = useState<bigint>(0n);
 
+  // 7702 one-tx deposit hooks
+  const {
+    deposit7702,
+    txHash: deposit7702Hash,
+    isPending: is7702Pending,
+    isConfirming: is7702Confirming,
+    isSuccess: is7702Success,
+    error: deposit7702Error,
+    reset: reset7702,
+  } = use7702Deposit();
+  const { data: delegation } = useDelegationStatus(address);
+  const atomicBatch = useAtomicBatchCapability();
+  const [deposit7702Id, setDeposit7702Id] = useState<string | null>(null);
+  const processed7702Success = useRef(false);
+
   // Track if we've processed a terminal state for the current transaction
   const processedApproveSuccess = useRef(false);
   const processedDepositSuccess = useRef(false);
@@ -80,6 +96,15 @@ export function DepositForm() {
     setDepositId(id);
     processedDepositSuccess.current = false;
     deposit(amount);
+  };
+
+  // Start 7702 one-tx smart deposit (delegation + approve + deposit in a single Type-4 tx)
+  const handle7702Deposit = () => {
+    if (!amount || isNaN(Number(amount))) return;
+    const id = addActivity({ type: 'deposit7702', status: 'pending', amount, message: 'Confirm in wallet…' });
+    setDeposit7702Id(id);
+    processed7702Success.current = false;
+    deposit7702(amount);
   };
 
   // Start permit deposit activity (one-tx deposit with signature)
@@ -183,6 +208,49 @@ export function DepositForm() {
     if (isPermitDepositing || isPermitDepositConfirming) processedPermitDepositSuccess.current = false;
   }, [isPermitDepositing, isPermitDepositConfirming]);
 
+  useEffect(() => {
+    if (is7702Pending || is7702Confirming) processed7702Success.current = false;
+  }, [is7702Pending, is7702Confirming]);
+
+  // Update 7702 deposit activity as it progresses
+  useEffect(() => {
+    if (!deposit7702Id) return;
+
+    if (is7702Confirming && !is7702Success && !deposit7702Error) {
+      updateActivity(deposit7702Id, { status: 'pending', message: 'Waiting for on-chain confirmation…' });
+    }
+  }, [is7702Confirming, is7702Success, deposit7702Error, deposit7702Id, updateActivity]);
+
+  // 7702 deposit success / error
+  useEffect(() => {
+    if (!deposit7702Id || processed7702Success.current) return;
+
+    if (is7702Success) {
+      processed7702Success.current = true;
+      updateActivity(deposit7702Id, {
+        status: 'success',
+        message: 'Delegated + approved + deposited in one tx (EIP-7702)',
+        txHash: deposit7702Hash,
+      });
+      setAmount('');
+      setDeposit7702Id(null);
+      const timer = setTimeout(() => reset7702(), 2000);
+      return () => clearTimeout(timer);
+    }
+
+    if (deposit7702Error) {
+      processed7702Success.current = true;
+      if (isUserRejectedError(deposit7702Error)) {
+        updateActivity(deposit7702Id, { status: 'error', message: 'Cancelled in wallet' });
+      } else {
+        updateActivity(deposit7702Id, { status: 'error', message: getContractErrorMessage(deposit7702Error) });
+      }
+      setDeposit7702Id(null);
+      const timer = setTimeout(() => reset7702(), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [is7702Success, deposit7702Error, deposit7702Id, deposit7702Hash, updateActivity, reset7702]);
+
   // When signature is ready, extract v,r,s and call permitDeposit
   useEffect(() => {
     if (!signature || !permitDepositId || !address || nonce === undefined || permitDeadline === 0n) return;
@@ -249,7 +317,7 @@ export function DepositForm() {
 
   if (!address) return null;
 
-  const isProcessing = isApproving || isApproveConfirming || isDepositing || isDepositConfirming || isSigning || isPermitDepositing || isPermitDepositConfirming;
+  const isProcessing = isApproving || isApproveConfirming || isDepositing || isDepositConfirming || isSigning || isPermitDepositing || isPermitDepositConfirming || is7702Pending || is7702Confirming;
   const hasAllowance = allowance !== undefined && (allowance as bigint) > 0n;
 
   // Surface the latest inline message from this form
@@ -329,6 +397,59 @@ export function DepositForm() {
         </div>
 
         <div className="space-y-3">
+          {/* 7702 Smart Deposit: delegation + approve + deposit in ONE transaction */}
+          <div className="border border-[var(--ink-green)]/25 rounded-lg p-4 bg-[var(--ink-green-bg)]/40 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-green)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+                <span className="text-sm font-semibold text-[var(--ink)]">EIP-7702 Smart Account</span>
+              </div>
+              {delegation?.delegated ? (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-[var(--ink-green-bg)] text-[var(--ink-green)] border border-[var(--ink-green)]/20"
+                  title={`Delegate: ${delegation.delegate}`}
+                >
+                  Delegated{delegation.delegate === METAMASK_DELEGATOR_ADDRESS ? ` → MetaMask ${shortenAddress(delegation.delegate)}` : ''}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-stone-100 text-stone-500 border border-stone-200">
+                  Standard EOA
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={handle7702Deposit}
+              disabled={!amount || is7702Pending || is7702Confirming || !atomicBatch.supported}
+              className="w-full bg-gradient-to-r from-[var(--ink-green)] via-[var(--ink-green)] to-[var(--copper)] text-white py-3 px-4 rounded-lg font-medium hover:opacity-90 disabled:bg-[var(--parchment)] disabled:text-[var(--ink-muted)] disabled:from-[var(--parchment)] disabled:to-[var(--parchment)] flex items-center justify-center gap-2"
+            >
+              {is7702Confirming ? (
+                <>
+                  <Spinner /> Confirming
+                </>
+              ) : is7702Pending ? (
+                <>
+                  <Spinner /> Confirm in wallet
+                </>
+              ) : (
+                '⚡ Smart Deposit (One-Click)'
+              )}
+            </button>
+
+            {atomicBatch.status === 'not-supported' ? (
+              <p className="text-xs text-[var(--seal-red)] text-center">
+                Wallet does not report atomic batch support. Enable the MetaMask Smart Account
+                (Account details → Upgrade) and try again.
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--ink-muted)] text-center">
+                Delegation + Approve + Deposit in one transaction via EIP-7702 (MetaMask Delegator)
+              </p>
+            )}
+          </div>
+
           <div className="flex gap-3">
             <button
               onClick={handleApprove}

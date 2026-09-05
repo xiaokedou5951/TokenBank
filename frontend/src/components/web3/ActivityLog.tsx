@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import { shortenAddress } from '@/lib/utils';
 
 type ActivityStatus = 'pending' | 'success' | 'error';
-type ActivityType = 'approve' | 'deposit' | 'withdraw';
+type ActivityType = 'approve' | 'deposit' | 'withdraw' | 'deposit7702';
 
 export interface Activity {
   id: string;
@@ -93,6 +93,7 @@ function activityTitle(type: ActivityType, amount?: string) {
     approve: 'Approve allowance',
     deposit: 'Deposit',
     withdraw: 'Withdraw',
+    deposit7702: 'Smart Deposit (7702)',
   }[type];
   return amount ? `${label} ${amount} MTK` : label;
 }
